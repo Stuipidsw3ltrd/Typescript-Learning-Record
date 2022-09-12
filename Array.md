@@ -1,3 +1,7 @@
+---
+typora-copy-images-to: ./img
+---
+
 # Typescript - Array
 
 ## Array constructor
@@ -65,5 +69,21 @@ Same as the `Array.prototype.forEach()`, `map()` also needs a `callBackFn()` arg
 let arr = Array(3);
 let arr2 = arr.map(e => "a"); // [<3 empty items>]
 let arr3 = arr.fill(null).map(e => "a"); // ["a", "a", "a"]
+```
+
+## Array unpack
+
+When you use unpack to assign value(like you assign values from an array to multiple variables):
+
+```typescript
+const arr = Array(2).fill(undefined)
+let [x, y] = arr // this is also the only way to assign values to multiple variables at the same time in TS.
+```
+
+When you want to unpack an array and pass the items within as function arguments, you can use spread syntax `...`
+
+```typescript
+let args = [1, 2, 3]
+let result = sum(...args)
 ```
 
