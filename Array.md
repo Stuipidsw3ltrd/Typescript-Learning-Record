@@ -71,6 +71,17 @@ let arr2 = arr.map(e => "a"); // [<3 empty items>]
 let arr3 = arr.fill(null).map(e => "a"); // ["a", "a", "a"]
 ```
 
+By the way, one thing interesting is that the spread syntax can fill the empty items with undefined as well:
+
+```typescript
+let x = Array(3) // x: [<3 empty items>]
+let y = [...x] // y: [ undefined, undefined, undefined ]
+// so I can use spread syntax to created an array filled with undefined, which means a map() can be followed directly
+let z = [...x].map(_ => "a") // z:["a", "a", "a"]
+```
+
+
+
 ## Array unpack
 
 When you use unpack to assign value(like you assign values from an array to multiple variables):
