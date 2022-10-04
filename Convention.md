@@ -146,3 +146,125 @@ let y: string = x // 报错，原因同上
 ```
 
 - never: 这个类型就是代表那种永远不会有值的类型，一般在会抛出异常的函数中作为返回值声明类型使用
+
+## TS中会让真假判断结果为false的值
+
+空字符串，数字0，undefined和null
+
+```typescript
+const not = val => !val
+// 以下全为true
+console.log(not(""))
+console.log(not(0))
+console.log(not(undefined))
+console.log(not(null))
+```
+
+## JS/TS 中的 bind()
+
+参考链接：[JavaScript Function bind() Method (w3schools.com)](https://www.w3schools.com/js/js_function_bind.asp)
+
+bind主要有两个作用：
+
+1. 为函数绑定作用域，防止this的context丢失
+2. 函数借调 - 让一个对象A使用另一个对象B的函数，并把B的函数作用域绑定至A
+
+### JS/TS 当中的 this 丢失 context 问题
+
+![image-20221003162045282](C:\Users\Hongyu Lin\AppData\Roaming\Typora\typora-user-images\image-20221003162045282.png)
+
+上图说明了this的指向。this的指向总结成一句话：跟this写在哪无关，跟谁调用它有关
+
+通常，当一个函数被作为回调函数，this会丢失它原本的上下文
+
+```javascript
+const person = {
+  firstName:"John",
+  lastName: "Doe",
+  display: function () {
+    let x = document.getElementById("demo");
+    x.innerHTML = this.firstName + " " + this.lastName;
+  }
+}
+
+setTimeout(person.display, 3000); // "undefined undefined" 因为setTimeout是一个定义在全局的函数，因此this会指向window
+```
+
+解决方案：使用bind方法，为函数手动绑定作用域：
+
+```typescript
+const person = {
+  firstName:"John",
+  lastName: "Doe",
+  display: function () {
+    let x = document.getElementById("demo");
+    x.innerHTML = this.firstName + " " + this.lastName;
+  }
+}
+display = person.display.bind(person)
+setTimeout(display, 3000); // "undefined undefined" 因为setTimeout是一个定义在全局的函数，因此this会指向window
+```
+
+在嵌套函数当中，this同样会丢失上下文
+
+```typescript
+class TestClass {
+    private a: number
+    constructor(){
+        this.a = 100
+    }
+    public nestFunction(){
+        function inner(){
+            console.log(this.a) // this is undefined
+        }
+        const inner = 
+        inner()
+    }
+}
+
+let a = new TestClass()
+a.nestFunction()
+```
+
+解决方案：使用箭头函数。箭头函数没有this，如果在箭头函数中用this，这个this会自动绑定到距离箭头函数层级最近的那个非箭头函数对象，在这里就是TestClass对象
+
+## 函数借调
+
+```javascript
+const person = {
+  firstName:"John",
+  lastName: "Doe",
+  fullName: function () {
+    return this.firstName + " " + this.lastName;
+  }
+}
+
+const member = {
+  firstName:"Hege",
+  lastName: "Nilsen",
+}
+
+let fullName = person.fullName.bind(member);
+console.log(fullName()) // "Hege Nilsen"
+```
+
+借调的时候，同时可以设置第二个函数给借来的函数一个参数默认值
+
+```javascript
+const person = {
+  firstName:"John",
+  lastName: "Doe",
+  fullName: function (greeting: string, mark: string) {
+    return greeting + this.firstName + " " + this.lastName + mark;
+  }
+}
+
+const member = {
+  firstName:"Hege",
+  lastName: "Nilsen",
+}
+
+let fullName = person.fullName.bind(member,"Hello: ", "!"); // 给借来的函数传递默认的参数
+console.log(fullName()) // "Hello: Hege Nilsen!"
+```
+
