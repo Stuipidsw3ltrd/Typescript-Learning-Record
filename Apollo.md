@@ -219,3 +219,47 @@ const [markFeatured] = useMutation(
   );
 ```
 
+## useSubscription()
+
+![image-20221012230423916](C:\Users\Hongyu Lin\AppData\Roaming\Typora\typora-user-images\image-20221012230423916.png)
+
+订阅是指在应用程序生命周期内对一项事件进行监听。应用程序中某种动作的发生、某种状态的变化都可以作为一个事件，事件由Apollo Server定义，所有客户端都可以订阅事件，一旦事件触发，将通知所有订阅该事件的客户端并向他们发送更新后的数据。
+
+React中可以使用useSubscription()来订阅一个事件，下面是一个简单的例子，这个例子效仿聊天频道，当一个用户发送了一条消息之后，所有在该频道的用户都能看到消息的实时更新。 
+
+```react
+import {gql, useSubscription} from "@apollo/client";
+
+const MESSAGE_SUBSCRIPTION = gql`
+	subscription MessageCreated {
+		messageCreated {
+			text
+			createdBy
+		}
+	}
+`
+
+export default Messages: React.FC<IMessagesProps> = () => {
+    const [comments, setComments] = useState([])
+    
+    const {data, loading} = useSubscription(MESSAGE_SUBSCRIPTION, {
+        onSubscription: (data) => {
+            const message = data.subscriptionData.data.messageCreated;
+            setComments(comments => [...comments, message])
+        }
+    })
+    
+    const commentsList = comments.map( (comment, index) => {
+        <li key={index}>
+            <p>{comment.createdBy} says {comment.text}</p>	
+        </li>
+    })
+    return (<ul>{commentList}</ul>)
+}
+```
+
+我们首先是用gql语句定义了一个subscription。同时设置了一个state来存储列表中的聊天信息。
+
+然后，我们用useSubscription来进行事件订阅，每次有新消息被创建的时候，这个事件都会被触发，从而通过订阅来向客户端发送新创建的信息。
+
+我们在useSubscription()的第二个参数中添加了一个回调onSubscription，这个回调会在每次事件触发，订阅返回数据更新时触发，这个回调中，我们在每次新消息添加过来的时候，都将这个新消息加入到消息列表当中，从而实现消息的实时更新。

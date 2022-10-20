@@ -268,3 +268,250 @@ let fullName = person.fullName.bind(member,"Hello: ", "!"); // 给借来的函�
 console.log(fullName()) // "Hello: Hege Nilsen!"
 ```
 
+```javascript
+class A {
+    name: string = 'A';
+    go() {
+        console.log(this.name);
+    }
+}
+
+class B {
+    name: string = 'B';
+    go() {
+        console.log(this.name);
+    }
+}
+
+const a = new A();
+a.go();
+const b = new B();
+b.go = b.go.bind(a);
+b.go(); // A
+```
+
+
+
+## const / let 和块级作用域
+
+Reference: [let & const: block scope in javascript](https://blog.csdn.net/weixin_46334272/article/details/114090340)
+
+块级作用域（block scope）是JavaScript ES6引入的新概念
+
+在之前，JS只有全局变量和函数局部变量的概念。ES6引入块级作用域的同时，也引入了let和const两个声明关键字。
+
+ES6之前：
+
+```javascript
+if (true){
+    var a = 10
+}
+
+function foo(){
+    var a = 20
+}
+
+console.log(a) // 不会报错，因为ES6之前，只有函数的作用域内是局部变量，if内部的a是全局变量，所以这里会输出10，非常反人类
+```
+
+```javascript
+var i = 5
+for (var i = 0; i < 10; i++){
+    //pass
+}
+console.log(i) //输出10，因为for循环作用域中的i也是全局变量
+```
+
+ES6之后，引入了块级作用域，所有花括号包裹起来的部分，都是一个独立的作用域了，因此在ES6中，if和for循环也将成为一个独立的作用域，而值得注意的是：**只有新引入的let和const关键字声明的变量，才能够触发块级作用域！** var关键字在非函数的块中声明出的变量依然是被视作全局变量（因此现在尽量少使用var）
+
+```javascript
+let i = 5
+for (let i = 0; i < 10; i++){
+    //pass
+}
+console.log(i) //输出5，因为for循环现在是一个独立的作用域，let在独立作用域中可以redeclare重名的变量
+```
+
+```javascript
+const x = 5
+{
+    const x = 10
+}
+console.log(x) //输出5，因为花括号内部是独立作用域
+```
+
+### const和let的异同
+
+let：不能重复声明，但可以重新给变量赋值，声明时不需要赋初始值
+
+const：不能重复声明，也不能重新赋值，声明时必须赋初始值
+
+```javascript
+let x = 10;
+x = 20 // legal
+let x = 30 // illegal
+const y = 10;
+y = 20; // illegal
+const y = 30; // illegal
+
+```
+
+注意，**const并非真正的常量**，const并不能保持一个变量的值不变，它是保持变量所指向的栈内存地址中的值不变。在深浅拷贝中已经写过，对于不可变类型的数据，其值就直接存在栈内存当中，对于可变数据类型，其在栈内存中保存的是一个指向堆地址的指针。所以，如果const声明的是一个可变类型（对象或者数组），那么修改其内部的值是不会报错的
+
+```javascript
+const x = []
+x.push(1)
+console.log(x) // [1]
+```
+
+## Asynchronous 异步
+
+一般来说，我们写的代码都是同步的，也就是从上到下依次执行，如果有A，B，C三个语句，那么B必须在A执行完了之后才能执行，C必须在B执行完了之后才能执行。
+
+这种在当前线程中代码执行的序列又叫callstack。
+
+如果现在，有A B C三个语句，其中B是异步的，那么，C可以不用等待B执行完毕就马上执行。如果B是很耗时的操作，C又需要马上执行，那么异步操作就变得相当有用。
+
+```javascript
+// 1
+console.log('Let's begin.');
+// 2
+setTimeout(() => {
+    console.log('I waited and am done now.');
+}, 3000);
+// 3
+console.log('Did I finish yet?');
+
+//输出
+Let's begin.
+Did I finish yet?
+I waited and am done now.
+```
+
+ES7推出了async和await关键字，这两个关键字可以更好的处理异步操作，但在此之前，异步操作都是由Promise对象来完成的。
+
+A **Promise** is an object with a delayed completion at some indeterminate future time.
+
+Promise是一个在未来某个事件延迟完成和确定的对象，由一个异步函数组成，我们需要把要异步执行的函数体，放在promise内部，并定义好在何种情况下是处理成功，何种情况是处理失败即可
+
+```javascript
+async function sayWordsAfterWhile(){
+    return new Promise<string>((resolve, reject) => {
+        setTimeout(()=>{
+            const randomNum = (Math.random() * 100 ) % 10
+            if (randomNum % 2 === 0){
+                resolve("I complete the async function!")
+            }else{
+                reject("encountered error")
+            }
+            
+        }, 3000)
+    })
+}
+
+let promiseResult = sayWordsAfterWhile()
+promiseResult.then(res => {
+    console.log("success: ", res)
+}).catch(err => {
+    console.log("error: ", err)
+})
+```
+
+可以看到，promise支持泛型，我们可以通过定义其泛型为string，从而声明了这个函数的返回值是`Promise<string>`, 同时，我们可以看到promise内部的函数，这个函数有两个参数，resolve和reject，这个是由promise自身提供的函数，如果函数体执行成功，那么就可以用resolve来返回处理结果，resolve返回的结果会作为then中回调函数的参数；如果promise函数体执行出错，就用reject返回对应的信息，reject返回的数据会作为catch的回调函数的参数。
+
+当我们拿到一个promise后，我们需要使用then和catch来注册相应的回调函数，代表当这个promise处理成功和失败的时候我们应该干什么。then和catch又可以嵌套新的promise，这样层层嵌套下去非常丑陋，代码很难读懂。
+
+```javascript
+let somePromise = someAsyncFunction()
+somePromise
+.then(res => {
+    let anotherPromise = anotherAsyncFunction(res)
+    anotherPromise
+    .then(secondRes => {
+        ...
+    })
+})
+```
+
+ 所以，async和await关键字的出现缓解了这一问题。
+
+async关键字用于函数声明，表明这是一个异步的函数，而await关键字则用于调用异步函数的时候。注意：await关键字只能用于有async关键字声明的函数当中
+
+```javascript
+async foo(){
+    let x = await anotherAsyncFunction()
+} 
+```
+
+下面看一段代码例子：
+
+```javascript
+import fetch from "@data-fetch"
+import constants from "@utility-constants"
+
+(async function getData() {
+    let response = await fetch(constants.pictureApi) // 这里不用try catch是因为fetch内部不会抛出reject，而是把响应的结果定义在resolve的数据当中
+    if (response.ok){
+        console.log("success")
+        let data = await response.json()
+        renderPicture(data)
+    }else{
+        throw new Error("encounter error!")
+    }
+})();
+```
+
+这里可以看到，我们通过await字段，可以直接等待这个异步函数的完成，因为后续的逻辑需要这个异步函数的返回值。
+
+如果我们用promise来写，那就是两个then的嵌套，第一个then我们得到response，判断它的状态，如果是ok的话，又会用then来处理response.json()这个请求，阅读起来非常的麻烦。而async和await可以把代码逻辑变得非常清楚明了，就像是同步的代码一样。
+
+上述代码片中的(async function getData(){...})()的写法叫做Immediately Invoked Function Expression(IIFE)，它的作用是可以同时声明和执行这个函数，当你需要在toplevel去使用await关键字的时候，就需要这么写。
+
+刚刚已经说过，await可以等待一个异步函数执行完毕，如果我们不使用这个字段，那么这个异步函数后续的代码将马上被执行，如果后续的语句依赖该异步函数的返回值，则这些语句将拿到一个空的Promise
+
+```javascript
+async function sayWordsAfterWhile(){
+    return new Promise<string>((resolve, reject) => {
+        setTimeout(()=>{
+            const randomNum = (Math.random() * 100 ) % 10
+            if (randomNum % 2 === 0){
+                resolve("I complete the async function!")
+            }else{
+                reject("encountered error")
+            }
+        }, 1000)
+    })
+}
+
+function test() {
+    console.log("step 1")
+    let res = sayWordsAfterWhile()
+    console.log(res)
+    console.log("step 3")
+}
+
+async function test2() {
+    console.log("step 1")
+    try{
+        const res = await sayWordsAfterWhile()
+        console.log(res)
+    }catch(err){ // 注意必须要handle exception，不然无法处理reject的情况，导致callstack被彻底阻塞
+        console.log(err)
+    }
+    console.log("step 3")
+}
+
+test()
+
+test2()
+
+=============================
+[LOG]: "step 1" 
+[LOG]: Promise: {} 
+[LOG]: "step 3" 
+
+[LOG]: "step 1" 
+[LOG]: "encountered error" 
+[LOG]: "step 3" 
+```
+

@@ -47,7 +47,7 @@ React当中的Context，如果其内的值发生变化，那么在Context Provid
 
 React中的Hook必须在：
 
-- 一个React组件的Root层级直接被调用
+- 一个React组件的Root层级中被无条件调用（不能在条件分支或者二级函数中被调用）
 
   ```react
   export default function Search() {
@@ -57,7 +57,7 @@ React中的Hook必须在：
   }
   ```
 
-- 在一个Custom Hook中被调用
+- 在一个Custom Hook的Root层级中被无条件调用
 
 ## One Root Element
 
@@ -609,3 +609,27 @@ useCallback 经常与 React.memo连用
 因为在React当中，每当组件被重渲染，组件中的函数都会被重新赋值和分配引用，因此新函数的引用跟被销毁组件中的函数根本不指向同一内存地址，两个对象只要引用不一样，那么默认情况下React会直接判定二者不是同一对象，从而导致React.memo判定达不到程序员想要的效果。
 
 这时候需要把要传给子组件的函数用useCallback所包裹起来，这时候如果依赖不变，那么这个函数将始终指向同一引用，这时候被React.memo包裹的子组件就能够接收到相同的函数对象了。
+
+### Custom Hooks
+
+自定义Hook的最终目的：共享相同的代码逻辑，减少代码冗余。
+
+自定义Hook就是一个函数，函数名以use开头，用use开头能让React将这个函数识别为一个hook，从而让其遵循[Hook规则](https://zh-hans.reactjs.org/docs/hooks-rules.html)
+
+程序员可以自行定义Custom Hook函数的参数和返回值
+
+```react
+export function useBeer(beerType: string) {
+    {data, loading, error} = useQuery(BEER_QUERY[beerType])
+    [price, setPrice] = useState(0)
+    if (data){
+        setPrice(data.beerInfo.price)
+    }
+    const setCrazySalePrice = (factor:number, bias:number) => {
+        this.setPrice(price * factor + bias)
+    }
+    return [price, setCrazySalePrice, loading]
+}
+```
+
+这个自定义Hook接收一个啤酒类别的参数，然后获取啤酒的实时价格，然后返回啤酒的价格state以及一个可以改变价格的函数和loading状态

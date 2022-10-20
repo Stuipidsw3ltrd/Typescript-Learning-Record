@@ -98,3 +98,20 @@ let args = [1, 2, 3]
 let result = sum(...args)
 ```
 
+## find
+
+
+
+## filter
+
+
+
+## reduce
+
+
+
+## some
+
+
+
+## every
