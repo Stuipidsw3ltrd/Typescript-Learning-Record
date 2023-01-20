@@ -633,3 +633,38 @@ export function useBeer(beerType: string) {
 ```
 
 这个自定义Hook接收一个啤酒类别的参数，然后获取啤酒的实时价格，然后返回啤酒的价格state以及一个可以改变价格的函数和loading状态
+
+## 状态提升
+
+在react当中，只有一条data flow，那就是从parent组件传递到child组件，如果想让child给parent传递信息，或者说同级组件之间传递信息，那么就需要用到状态提升。
+
+状态提升是一种让两个非父子关系的组件进行通讯的方法。
+
+简单说：状态提示就是让两个组件拥有同一个parent，然后把这两个兄弟组件直接通讯需要的状态都存在parent组件里面
+
+```react
+export const ParentComponent:React.FC<IParentProps> = (props) => {
+    const [num, setNum] = setState(0) // 状态提升，Alpha和Beta通讯的状态被存储在共同的parent组件中
+    const numIncrement = (n: number) => {
+        setNum(n)
+    }
+    return (
+    	<ChildComponentAlpha num={num}></ChildComponentAlpha>
+        <ChildComponentBeta numIncrement={numIncrement}></ChildComponentBeta>
+    )
+}
+
+
+export const ChildComponentAlpha: React.FC<IAlphaProps> = ({num}) => {
+    return (<div>The current num is: {num} </div>) //ChildAlpha显示ChildBeta设置的随机数
+}
+
+export const ChildComponentBeta: React.FC<IBetaProps> = ({numIncrement}) => {
+    const randomNumber = Math.floor(Math.random() * 100) // ChildBeta使用一个随机数与ChildAlpha通讯
+    const clickHandler = () => {
+        numIncrement(randomNumber);
+    }
+    return (<button onclick={clickHandler}>Click Me!</button>)
+}
+```
+

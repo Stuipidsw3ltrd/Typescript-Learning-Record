@@ -98,6 +98,32 @@ let args = [1, 2, 3]
 let result = sum(...args)
 ```
 
+## indexOf
+
+JavaScript没有python的in关键字来查看一个列表是不是包含某个元素，在js中使用较为频繁的对应方法是indexOf和includes。
+
+indexOf() 方法接收一个元素，返回一个索引，如果该元素在列表当中，返回列表中第一个匹配元素的索引，否则返回-1
+
+```javascript
+let x = [1,2,3,4]
+console.log(x.indexOf(1)) // 0
+console.log(x.indexOf(5)) // -1
+```
+
+
+
+## includes
+
+includes相对于indexOf更为简单，它是一个真假判断，给定一个元素，如果该元素存在于array，那么就是返回true，否则返回false
+
+```javascript
+let x = [1,2,3,4]
+console.log(x.includes(1)) // true
+console.log(x.includes(5)) // false
+```
+
+
+
 ## find
 
 

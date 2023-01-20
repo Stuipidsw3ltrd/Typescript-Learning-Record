@@ -1,4 +1,121 @@
-# Convention
+# JavaScript/TypeScript
+
+## JS中的事件循环(Event Loop)
+
+JS是单线程的语言，因此，JS会通过将不同函数的执行上下文压入执行调用栈中来保证代码的有序执行。在执行同步代码的时候，如果遇到异步事件，JS引擎并不会一直等待异步事件响应，而是先将异步事件挂起，转而去执行栈中的其他任务。JS会将异步任务或其回调函数加入到一个任务队列当中等待执行。
+
+这个任务队列根据任务类型的不同分为两类：一种是 **微任务队列**；另一种是 **宏任务队列**；
+
+常见的微任务：Promise.then()/Promise.catch(); node中的process.nextTick; 对DOM变化监听的MutationObserver
+
+常见的宏任务：Script脚本的执行; setTimeout(), setInterval(), setImmediate() 之类的定时事件; I/O操作; UI渲染
+
+事件循环的过程：
+
+1. 从宏任务队列中取出头部的宏任务执行（第一次的话这个宏任务就是执行Script脚本）
+2. 按照调用栈的顺序，执行该宏任务中的所有同步代码，期间如果遇到微任务，就将其加入微任务队列，如果遇到宏任务，就加入到宏任务队列；
+3. 该轮宏任务执行完毕，检查微任务队列，如果存在微任务，则按照入队顺序执行这些微任务；执行这些微任务的期间，如果又进一步发现微任务，则将其加入到微任务队列，如果进一步发现宏任务则也加入到宏任务队列
+4. 重复 3. 直到微任务队列当中不再存在微任务
+5. 一轮事件循环循环结束，如果宏任务队列中存在宏任务，则返回1. ，否则该次执行结束。
+
+简而言之，事件循环中的任务执行顺序为：本轮宏任务中的同步代码 -> 本轮宏任务中的所有微任务 -> 下一轮宏任务 ...
+
+下面看几个例子：
+
+```typescript
+async function async1 () {
+	console.log('async1 start')
+	await async2()
+	console.log('async1 end')
+}
+
+async function async2 () {
+	console.log('async2 start')
+}
+
+console.log('script start')
+
+setTimeout(function() {
+	console.log('setTimeout 1')
+}, 2000)
+
+setTimeout(function() {
+	console.log('setTimeout 2')
+}, 0)
+
+async1()
+
+new Promise(function (resolve) {
+	console.log('proimse1')
+	resolve()
+}).then(function() {
+	console.log('promise2')
+})
+console.log('script end')
+
+```
+
+这段代码的输出应该是：
+
+```javascript
+script start
+async1 start
+async2 start
+proimse1
+script end
+async1 end
+promise2
+setTimeout 2
+setTimeout 1
+```
+
+首先，JS会执行第一个宏任务，就是这个脚本本身。
+
+JS会优先执行所有同步代码，而异步事件则将其或者其回调放入到对应的队列当中：
+
+```javascript
+1. 执行到的第一句同步输出代码就是 console.log('script start')
+2. 往下发现setTimeout 1 和 setTimeout 2，这是两个宏任务，直接将其加入到宏任务队列当中
+3. 再往下走到async1()的调用当中，进入async1()函数，首先执行同步代码 console.log('async1 start')
+4. 然后进入到await async2(), 注意，这里调用栈中的顺序是：会先执行async2()中的所有同步代码，不会看到await就直接将其挂起，栈执行顺序就类似深度优先（它不先进去怎么知道该这个异步函数是该fulfill还是走到更深的调用栈才能fulfill呢？）
+5. console.log('async2 start') 被执行，然后 return， 这里由于async2是异步函数，所以return 相当于 return Promise.resolve()
+6. async2 resolve 之后，出来看到自己被await修饰（函数调用语句从右到左执行），所以自己下面的语句就是被自己阻塞住的语句，也就是它的回调（await就是Promise的语法糖，被await阻塞的语句就相当于是Promise.then(), 在await过程被catch后要执行的语句就相当于是Promise.catch()）
+7. 将console.log('async1 end')加入到微任务队列， async1() 执行完毕
+8. 来到new Promise 这里，注意，new Promise 一旦被定义，传入其中的函数将会被立即执行，所以这里直接执行同步代码 console.log('proimse1')
+9. 然后 new Promise 被 resolve；一旦resolve，就可以进入到.then回调当中，发现then回调是一个微任务，于是将其放入微任务队列
+10.执行脚本最后一行console.log('script end')
+11.此时当前轮宏任务的同步代码已经执行完毕。而微任务队列当前有：1） console.log('async1 end') 2）console.log('promise2') 宏任务队列当中有两个setTimeOut
+12.因此我们需要清空微任务队列，按照入队顺序依次执行1）和2）
+13.微任务执行完毕，现在开始执行下一个宏任务setTimeout1，执行完毕。注意，是setTimeout这个计时函数本身是一个宏任务，而不是其回调函数。这里执行就执行了，JS并不会去等待setTimeout时间结束触发回调。
+14.执行最后一个宏任务setTimeout2,执行完毕。
+15.setTimeout2回调触发，执行console.log('setTimeout 2')
+16.两秒后，setTimeout1回调触发，执行console.log('setTimeout 1')
+```
+
+上述例子非常详细了，触类旁通可以按照事件循环的原理推敲出所有异步代码的执行顺序，下面再看一个小例子：
+
+```javascript
+new Promise((resolve, reject) => {
+    setTimeout(() => {console.log('setTimeout'); resolve('')}, 1000)
+})
+.then(() => console.log('resolve 1'))
+.then(() => console.log('resolve 2'))
+```
+
+执行顺序为`setTimeout -> resolve 1 -> resolve 2`
+
+```javascript
+原理一样很简单：
+1. 执行Promise中的函数，发现是个宏任务，将其加入到宏任务队列
+2. 此时已经没有可以执行的同步代码，且微任务队列为空(Promise没有被resolve，进不到then当中去)
+3. 一轮事件循环结束，从宏任务队列中拿出setTimeout执行，执行完毕。
+4. 等待一秒后，回调触发（现在这个回调就相当于一个宏任务了），按调用栈顺序执行同步代码：打印setTimeout，然后resolve
+5. 因为resolve了，所以进入到第一个then当中，发现是个then微任务，将其加入到微任务队列当中，没有可以执行的同步代码，现在微任务队列中有一个then回调，所以执行它，打印resolve 1，然后return（相当于return Promise.resolve())
+6. 因为resolve了，所以走到第二个then，发现是微任务，加入微任务队列。没有同步代码可以执行了，微任务队列有then回调，执行它，打印resolve 2。
+7. 微任务队列清空。宏任务队列没有新任务了。执行结束。
+```
+
+
 
 ## TS中的深浅拷贝
 
