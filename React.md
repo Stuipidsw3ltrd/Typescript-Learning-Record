@@ -246,15 +246,6 @@ const CartProvider = (props:IChildrenProps) => {
     }></button>
 ```
 
-## 骚操作:快速转化String为Number
-
-```typescript
-// normal way
-let x = parseInt(str)
-// terrific way
-let y = +str // 对负数也有效，并不会把负数变成正数。str必须是能转化为数字的字符串,不然报错
-```
-
 ## 更新状态要避免直接修改老状态
 
 React中在更新状态的时候要避免可变对象(Mutable Object)的产生，在更新状态的时候，不要直接对老的状态对象进行修改，而是应该直接返回一个新对象，然后让新对象成为新的状态对象
