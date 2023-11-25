@@ -288,8 +288,6 @@ bind主要有两个作用：
 
 ### JS/TS 当中的 this 丢失 context 问题
 
-![image-20221003162045282](C:\Users\Hongyu Lin\AppData\Roaming\Typora\typora-user-images\image-20221003162045282.png)
-
 上图说明了this的指向。this的指向总结成一句话：跟this写在哪无关，跟谁调用它有关
 
 通常，当一个函数被作为回调函数，this会丢失它原本的上下文

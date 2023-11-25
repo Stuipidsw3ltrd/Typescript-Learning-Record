@@ -1,5 +1,124 @@
 # React
 
+## JSX的本质
+
+JSX就是允许我们在JS代码中穿插一些HTML的组件的语法，如下所示：
+
+```react
+...
+render() {
+	return (
+  <div> 
+    <button id="lhy">
+      Hit
+    </button>
+  </div>
+) // 这就是jsx语法，它不能被原生JS正常编译，会产生语法错误
+}
+```
+
+JSX本质其实就是React.createElement的语法糖，当我们写出上述的JSX语法代码之后，Babel会帮我们自动将其解析成为React的代码。
+
+React.createElement 会接受3个参数，分别是type, config, children，其中：
+
+- type 为 html元素的类型
+- config 为传入组件中的 props
+- children 为该组件的子组件对象
+
+上述的JSX代码经过babel转换后会成为如下代码
+
+```js
+/*#__PURE__*/ React.createElement(
+  "div",
+  null,
+  /*#__PURE__*/ React.createElement(
+    "button",
+    {
+      id: "lhy"
+    },
+    "Hit"
+  )
+);
+
+```
+
+
+
+## 虚拟DOM
+
+从上一节中可以看到 React.createElement 最终会返回一个 ReactElement 对象，这个对象有一个 children 属性，其值也是一个 ReactElement 对象。这样就组成了一个由 ReactElement 组成的对象树，而这个对象树就是“虚拟DOM“
+
+```jsx
+(
+  <div>
+    <h2>
+      <div>Hello</div>
+    </h2>
+    <button id="cmq">
+      Hit
+    </button>
+    <button id="lhy">
+      Hit
+    </button>
+  </div>
+)
+```
+
+```js
+/*#__PURE__*/ React.createElement(
+  "div",
+  null,
+  /*#__PURE__*/ React.createElement(
+    "h2",
+    null,
+    /*#__PURE__*/ React.createElement("div", null, "Hello")
+  ),
+  /*#__PURE__*/ React.createElement(
+    "button",
+    {
+      id: "cmq"
+    },
+    "Hit"
+  ),
+  /*#__PURE__*/ React.createElement(
+    "button",
+    {
+      id: "lhy"
+    },
+    "Hit"
+  )
+);
+// 这颗对象树就是我们的虚拟DOM
+```
+
+因此，我们整个JSX-真实DOM的流程就是：JSX代码经过babel编译，得到ReactElement对象树（虚拟DOM），再经过原生平台的渲染，成为真实DOM
+
+虚拟DOM最关键的两个作用：
+
+1. 提高性能：通过虚拟DOM，我们不用每次在页面更新的时候，都去更新整个真实DOM，而是可以在新虚拟DOM和老虚拟DOM之间进行一个快速Diff算法，来得出需要更新的部分，并且只更新这一部分，从而达到提升性能的目的
+2. 多平台支持：虚拟DOM只是一个JS对象，这代表它具有更高的灵活性。在Web开发中，它可以被 `document.createElement` 这种HTML的语法渲染成HTML组件，同样的，React-Native可以将这个JS对象渲染成苹果，安卓等平台的原生组件
+
+## React 脚手架
+
+脚手架是即用的工程项目模版，每个框架都有自己的脚手架。React的脚手架为`create-react-app`, 它使用node.js编写，打包工具则是基于webpack。
+
+```cmd
+# install scaffold
+npm install create-react-app -g
+
+# create your app
+cd path/to/folder
+create-react-app your-app-name
+
+# run your app
+cd your-app-name/
+npm run start # we can see the command in package.json
+```
+
+脚手架目录结构介绍
+
+![image-20231121215939091](./React.assets/image-20231121215939091.png)
+
 ## 重渲染(re-render)
 
 重渲染前提：
