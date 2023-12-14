@@ -98,7 +98,7 @@ React.createElement 会接受3个参数，分别是type, config, children，其�
 1. 提高性能：通过虚拟DOM，我们不用每次在页面更新的时候，都去更新整个真实DOM，而是可以在新虚拟DOM和老虚拟DOM之间进行一个快速Diff算法，来得出需要更新的部分，并且只更新这一部分，从而达到提升性能的目的
 2. 多平台支持：虚拟DOM只是一个JS对象，这代表它具有更高的灵活性。在Web开发中，它可以被 `document.createElement` 这种HTML的语法渲染成HTML组件，同样的，React-Native可以将这个JS对象渲染成苹果，安卓等平台的原生组件
 
-## React 脚手架
+## 脚手架
 
 脚手架是即用的工程项目模版，每个框架都有自己的脚手架。React的脚手架为`create-react-app`, 它使用node.js编写，打包工具则是基于webpack。
 
@@ -119,7 +119,1330 @@ npm run start # we can see the command in package.json
 
 ![image-20231121215939091](./React.assets/image-20231121215939091.png)
 
-## 重渲染(re-render)
+## 组件的类型划分
+
+React是基于组件式开发的思想，组件是构成整个React APP的基本单位。根据不同的准则，可以将React中的组件划分为：
+
+1. 按照声明方式划分：类组件和函数式组件
+2. 按照有无状态管理划分：有状态组件和无状态组件
+3. 按照职责划分：容器组件和渲染组件（容器组件注重数据的逻辑计算，而渲染组件主要用于UI渲染）
+
+## JSX组件能够返回的数据类型
+
+当类组件的render函数或者函数组件的return语句被调用时，它会检查`this.props`和`this.state`的变化并返回以下类型之一：
+
+1. React元素：即我们通过JSX语法创建的东西（<div>hahaha</div>），HTML的原生组件如div，会被渲染成DOM节点，而<MyComponent>这种则会被渲染成自定义组件
+2. 字符串或数值类型：会在DOM中被渲染成文本节点
+3. 布尔类型或者Null：什么都不渲染
+4. 数组或者Fragments：使render方法能够返回多个元素，这些元素会被遍历并渲染
+5. Portals：可以使该元素被渲染到不同的DOM子树当中去
+
+## 组件的生命周期
+
+组件的生命周期仅用于类组件，函数组件是没有明确的生命周期及其函数定义的。在函数组件当中，我们通常是使用各类hook函数来模拟生命周期。下面是简化版和详细版的生命周期示意图。
+
+![React lifecycle methods diagram](./React.assets/ogimage.png)
+
+![React Lifecycle Methods - A Deep Dive - Programming with Mosh](./React.assets/Screen-Shot-2018-10-31-at-1.44.28-PM.png)
+
+1. Constructor
+
+   当要渲染一个组件的时候，第一步就是先实例化该组件，得到一个JSX Element。类组件的构造函数通常只做两件事情：
+
+   - 初始化内部的state
+   - 为事件绑定this实例
+
+   因此，如果不需要在类组件内进行state初始化或者this绑定，则不需要为类组件写构造函数
+
+2. componentDidMount
+
+   该函数会在组件挂载（插入DOM树中）后立即调用。
+
+   该生命周期阶段通常适用于进行下列操作：
+
+   - 依赖于DOM的操作
+   - 发送网络请求
+   - 添加一些订阅（取消订阅则在componentWillUnmount中进行）
+
+3. componentDidUpdate
+
+   该函数会在组件在DOM中被更新后被立即调用，首次渲染则不会执行此方法。
+
+   该生命周期阶段通常适用于进行下列操作：
+
+   - 当组件更新后，可以对DOM进行一些操作
+   - 如果对更新前后的props进行了比较，也可以选择在此处进行网络请求（若props更新则发送网络请求）
+
+4. componentWillUnmount
+
+   该函数会在组件卸载及销毁之前直接调用。
+
+   该生命周期阶段通常适用于进行下列操作：
+
+   - 执行必要的清理操作，防止内存泄漏。例如清除timer、取消未完成的网络请求以及取消订阅等等
+
+5. getDerivedStateFromProps（罕见，几乎不使用）
+
+   state的值在任何时候都依赖于props的时候使用。该方法返回一个对象来更新state
+
+6. shouldComponentUpdate
+
+   该函数会在props和state改变后，再次调用render函数之前调用。
+
+   该函数用于自定义组件重渲染规则。
+
+7. getSnapshotBeforeUpdate
+
+   该函数会在DOM更新之前执行，可以获取DOM更新前的一些信息（比如说，我们可以通过该函数返回DOM更新前的滚动位置，这个位置信息将在componentDidUpdate的参数列表中拿到，然后我们可以把新旧两个滚动位置进行对比，根据结果实现一些操作）
+
+   ```jsx
+   componentDidUpdate(prevProps, prevState, snapshot) {
+     console.log(snapshot.scrollPosition) // 在这里可以拿到getSnapshotBeforeUpdate返回的值
+   }
+   
+   getSnapshotBeforeUpdate() {
+     return {
+       scrollPosition: this.getScrollPosition()
+     }
+   }
+   ```
+
+   
+
+## 组件间通信
+
+### 参数类型验证和默认参数
+
+如果使用的是Typescript，那么语言特性直接就能做到参数类型验证。
+
+如果使用的是Javascript，那么需要使用到 `propTypes` 来进行参数类型验证
+
+```javascript
+import React from 'react'
+import PropTypes from "prop-types"
+
+export function MainBanner (props) {
+  ...
+}
+
+// 参数类型验证
+MainBanner.propTypes = {
+  banners: PropTypes.string,
+  title: PropTypes.string
+}
+  
+// 默认参数
+MainBanner.defaultProps = {
+  banner: "defaultBanner",
+  title: "defaultTitle"
+}
+```
+
+### 子组件传递消息给父组件
+
+子传父通常需要父组件将一个回调函数传递给子组件，这个回调函数中通常会对父组件的状态进行一些操作，当子组件调用该回调函数，则会对父组件的状态进行更新。
+
+```jsx
+//parent component
+import React, { useState } from "react";
+import AddCounter from "./AddCounter";
+
+export default function App() {
+  const [count, setCount] = useState(0);
+  const updateCount = (num) => setCount(count + num)
+  return (
+    <>
+      <h2>Current Counter: {count}</h2>
+      <AddCounter setCountFn={updateCount}/> // pass the callback to son component
+    </>
+  );
+}
+```
+
+```jsx
+// son component
+import React from "react";
+
+export default function AddCounter(props) {
+    const changeCount = num => props.setCountFn(num)
+  return (
+    <>
+      <button onClick={() => changeCount(1)}>+1</button>
+      <button onClick={() => changeCount(-1)}>-1</button>
+    </>
+  );
+}
+```
+
+### 插槽 (slot)
+
+插槽是Vue和小程序中的概念。当一个组件预留了一个插槽，则这个插槽可以插入任何组件。这通常适用于一个组件被应用于多个不同上下文的场景。比如说某个导航栏组件，它在商品页面的上下文时，可能由搜索框组成，而在订单页面的上下文时，它可能是由 ”已发货“、”已收货“ 等等tab所组成。这时我们往导航栏组件中预留一些插槽，在需要的时候，通过插槽的名字来往对应插槽中插入需要的组件（又称具名插槽）。
+
+React中没有插槽这一概念，反之，得益于React的灵活性，我们完全可以在React中非常方便地手动实现插槽。
+
+1. 通过children来实现插槽 （不推荐）
+
+这种方式要通过数组索引的方式来取得children当中的组件，同时，如果children当中有多个元素的时候，children的类型会是一个由JSX元素组成的数组，而如果它只有一个元素的时候，它的类型就直接是一个JSX元素。因此，这种写法非常容易出错，通过数组索引的方式也非常不优雅，因此不推荐。
+
+```jsx
+import React from 'react'
+import NavBar from './nav-bar/NavBar'
+
+export default function App() {
+  return (
+    <NavBar>
+        <div>left</div>
+        <i>center</i>
+        <button>right</button>
+    </NavBar>
+  )
+}
+
+```
+
+```jsx
+import React from 'react'
+import './NavBar.css'
+
+export default function NavBar(props) {
+  const children = props.children
+  return (
+    <div className='nav-bar'>
+        <div className='left'>{children[0]}</div>
+        <div className='center'>{children[1]}</div>
+        <div className='right'>{children[2]}</div>
+    </div>
+  )
+}
+
+```
+
+2. 通过往props中传递JSX元素来实现插槽
+
+这种方式更加接近具名插槽
+
+```jsx
+import React from 'react'
+import NavBar from './nav-bar/NavBar'
+
+export default function App() {
+  return (
+    <NavBar
+        left={<div>left</div>}
+        center={<i>center</i>}
+        right={<button>right</button>}
+    />
+  )
+}
+```
+
+```jsx
+import React from 'react'
+import './NavBar.css'
+
+export default function NavBar(props) {
+  return (
+    <div className='nav-bar'>
+        <div className='left'>{props.left}</div>
+        <div className='center'>{props.center}</div>
+        <div className='right'>{props.right}</div>
+    </div>
+  )
+}
+
+```
+
+#### 作用域插槽
+
+在React中，当我们把JSX元素以props或children的形式传给目标组件后，我们想让这些JSX元素使用目标组件中的数据或者状态，这就是作用域插槽的应用场景。作用域插槽在React中的解决方案就是子传父的组件通信，通过给目标组件传递一个**“参数为状态或数据，返回值为JSX元素”**的回调函数，从而达到作用域插槽的目标。
+
+```jsx
+import React from 'react'
+import NavBar from './nav-bar/NavBar'
+
+export default function App() {
+  const leftContextSlot = text => <div>{text}</div>
+  const centerContextSlot = text => <i>{text}</i>
+  const rightContextSlot = text => <button>{text}</button>
+  return (
+    <NavBar
+        left={leftContextSlot}
+        center={centerContextSlot}
+        right={rightContextSlot}
+    />
+  )
+}
+
+```
+
+```jsx
+import React from 'react'
+import './NavBar.css'
+
+export default function NavBar(props) {
+  return (
+    <div className='nav-bar'>
+        <div className='left'>{props.left("myLeft")}</div>
+        <div className='center'>{props.center("myCenter")}</div>
+        <div className='right'>{props.right("myRight")}</div>
+    </div>
+  )
+}
+
+```
+
+### 非父子组件间通信
+
+#### context (详见[useContext](###useContext()))
+
+#### 状态提升
+
+状态提升就是让两个组件拥有同一个parent，然后把这两个兄弟组件直接通讯需要的状态都存在parent组件里面
+
+```jsx
+export const ParentComponent:React.FC<IParentProps> = (props) => {
+    const [num, setNum] = setState(0) // 状态提升，Alpha和Beta通讯的状态被存储在共同的parent组件中
+    const numIncrement = (n: number) => {
+        setNum(n)
+    }
+    return (
+    	<ChildComponentAlpha num={num}></ChildComponentAlpha>
+        <ChildComponentBeta numIncrement={numIncrement}></ChildComponentBeta>
+    )
+}
+
+
+export const ChildComponentAlpha: React.FC<IAlphaProps> = ({num}) => {
+    return (<div>The current num is: {num} </div>) //ChildAlpha显示ChildBeta设置的随机数
+}
+
+export const ChildComponentBeta: React.FC<IBetaProps> = ({numIncrement}) => {
+    const randomNumber = Math.floor(Math.random() * 100) // ChildBeta使用一个随机数与ChildAlpha通讯
+    const clickHandler = () => {
+        numIncrement(randomNumber);
+    }
+    return (<button onclick={clickHandler}>Click Me!</button>)
+}
+```
+
+#### 事件总线
+
+在JavaScript中，事件总线是一种设计模式，用于简化组件之间的通信。它允许不同组件在不直接耦合的情况下进行通信，通过在一个中心位置注册、触发和监听事件。这个中心位置被称为事件总线。
+
+事件总线通常有两个主要部分：事件的触发者和事件的监听者。一个组件触发一个事件，而其他组件则监听该事件以执行相应的操作。这种模式有助于将代码解耦，提高组件的可维护性和可扩展性。
+
+```jsx
+import React from 'react'
+import SiblingA from './SiblingA'
+import SiblingB from "./SiblingB"
+
+
+export default function App() {
+  return (
+    <>
+      <h2>EventBusAPP</h2>
+      <SiblingA></SiblingA>
+      <SiblingB></SiblingB>
+    </>
+  )
+}
+
+```
+
+```jsx
+import React from "react";
+import eventBus from "./utils/eventBus"; // 从第三方库引入事件总线对象
+
+export default function SiblingA() {
+
+  const increaseHandler = () => {
+    eventBus.emit("increase") // 发送事件
+  }
+
+  const decreaseHandler = () => {
+    eventBus.emit("decrease") // 发送事件
+  }
+  return (
+    <>
+      <button onClick={increaseHandler}>Sibling A: Let B + 1</button>
+      <button onClick={decreaseHandler}>Sibling A: Let B - 1</button>
+    </>
+  );
+}
+```
+
+```jsx
+import React, { useEffect, useState } from "react";
+import eventBus from "./utils/eventBus";
+
+export default function SiblingB() {
+  const [num, setNum] = useState(0);
+
+  useEffect(() => {
+    console.log("useEffect triggered!")
+    const increaseHandler = () => setNum(prevNum => prevNum + 1);
+    const decreaseHandler = () => setNum(prevNum => prevNum - 1);
+    eventBus.on("increase", increaseHandler); // 监听事件
+    eventBus.on("decrease", decreaseHandler); // 监听事件
+
+    return () => eventBus.clear();
+  }, []);
+  return <div>SiblingB's current num: {num}</div>;
+}
+```
+
+## setState的三种用法
+
+1. 第一个参数传入一个对象
+
+​	这种方式是最普遍的，当传入一个对象后，React会使用`Object.assign(prevState, newState)`的方式去合并新的状态对象和老的状态对象，从而完成状态的更新
+
+2. 第一个参数传入一个函数
+
+   这种方式适用于当你想在更新状态的时候根据前一个时间步的状态和props做一些计算来得到新状态的情况。
+
+   ```jsx
+   ...
+   const clickHandler = () => {
+     this.setState((prevState, prevProps) => {
+       const newState = codeToCalculateNewState(prevState, prevProps)
+       return newState
+     })
+   } 
+   ```
+
+   当然，我们也可以把这个计算的逻辑单独抽成一个函数，然后把计算结果通过第一种用法传给setState。但是如果直接写在setState内会让内聚性更好。
+
+3. 第二个参数传入一个callback函数
+
+   setState 是一个异步函数，当我们想要在这个异步函数执行完成之后做一些事情，就可以把这个逻辑抽成一个回调函数，传给setState的第二个参数。
+
+   ```jsx
+   this.setState(newState, () => {
+     console.log('successfully set new state.')
+   })
+   ```
+
+## setState为什么要设计成异步函数
+
+1. 性能优化：减少重渲染次数
+
+   不管是类组件的setState还是函数组件的状态管理函数，它们都是异步的。这样做的原因之一是为了减少重渲染次数。React设计了一种叫做“批处理”的机制来延迟状态的实际更新和重新渲染，以提高性能。比如说，当一个button的onClick函数中调用了多次setState函数时，这些调用都会加入本轮事件循环中的微任务队列，React会通过do while函数将这个队列里面的状态变化事件全部取出来，将其依次计算并合并最后的结果，因此最终实际只会发生一次重渲染。
+
+   如果setState是同步函数，那每调用一次就会做一次重渲染，大大降低性能
+
+2. setState函数如果是同步函数，它被执行之后，状态立马改变，但这个时候还没有执行render函数，如果父组件将state的值传给了子组件，那么子组件的props和父组件的state将不能保持同步，这种不一致性会在开发中导致很多问题
+
+## React性能优化相关知识
+
+### 虚拟DOM的Diff算法
+
+当重渲染被触发时，React的render方法会被调用，从而创建出一个新的虚拟DOM。在新的虚拟DOM生成之后，React会将新老虚拟DOM进行一次Diff计算，以判断如何来更新真实DOM，这个Diff算法有几个特点
+
+1. 复杂度为 $O(n)$
+2. 仅仅会比较同层节点，不会跨层比较
+3. 不同类型的节点会产生不同的树结构：父节点类型的变化会导致子树被完全重新生成，不会再做比较
+
+### 通过 shouldComponentUpdate, PureComponent, memo 来避免不必要的重渲染
+
+在React当中，如果父节点被重新渲染，那么默认情况下子组件也会被重渲染。但很多时候，子组件可能只依赖于父组件的部分状态或props，甚至根本就不依赖父组件的任何状态，这个时候如果导致父节点重渲染的状态变化并不会影响子组件的时候，重渲染该子组件就是一种性能浪费。因此React提出了一系列方式来优化这种性能浪费。
+
+#### shouldComponentUpdate(SCU)
+
+类组件中，我们可以在该生命周期函数中定义我们期望的重渲染条件，该函数会在render函数被调用之前执行。
+
+#### PureComponent
+
+类组件中，我们可以使组件继承 PureComponent 这个类，这样的话，只有该组件的props或者state发生变化时，该组件才会被重渲染。
+
+PureComponent的实质是对新老state和props做一个浅层比较（对于复杂对象只比较第一层）:
+
+```jsx
+if(ctor.prototype && ctor.prototype.isPureReactComponent) {
+  return (
+  	!shallowEqual(oldProps, newProps) || !shallowEqual(oldState, newState)
+  )
+}
+```
+
+#### memo
+
+函数组件中，memo的作用就类似于PureComponent，通过用memo包裹函数组件，可以只在props或者state更新的情况下重渲染组件
+
+## 数据不可变
+
+在React中更新状态时，一定要确保新状态对象和老状态对象指向的是不同的引用。原因很简单，如果我们直接在老状态对象上做修改，并且直接把修改后的老状态对象传给 setState 或者状态管理函数，那么在 PureComponent 或者函数组件做新老状态对比的时候，**新状态和老状态将指向同一引用**，这样的话组件将永远不会更新。
+
+永远保证新状态对象指向新的引用，不要直接修改老状态，这就是React中的数据不可变。
+
+对于不可变数据类型，创建新值的同时就已经让该值指向新引用了。
+
+对于可变数据类型，如果我们只是使用PureComponent或者Memo，那么我们可以直接对其进行浅拷贝即可，否则，如果我们对状态有更严格的对比要求，且可变数据类型的子元素也包含可变数据类型，则需要进行深拷贝。这跟React的 PureComponent 中的SCU算法 `shallowEqual ` 有关系，该算法会对新老状态对象进行浅层对比，该算法伪代码如下：
+
+```jsx
+function shallowEqual(objA, objB) {
+  // 1. 判断A和B是不是同一对象
+  if(is(objA,objB)){
+    return true;
+  }
+  
+  // 2. 判断A和B是否为可变数据类型
+  if(typeof objA !== 'object' || objA === null || typeof objB !== 'object' || objB == null) {
+    return false;
+  }
+  
+  // 3. 如果A和B均为可变数据类型
+  
+  const keysA = Object.keys(objA);
+  const keysB = Object.keys(objB);
+  
+  // 3.1. 如果keys长度不同，直接返回false
+  if (keysA.length !== keysB.length) {
+    return false;
+  }
+  
+  // 3.2. 否则，逐一比较每个B是否有A中的所有key，以及其对应value是否为同一对象
+  for(let i = 0; i < keysA.length; i++) {
+    const currentKey = keysA[i];
+    if(!hasOwnProperty.call(objB, currentKey) || !is(objA[currentKey], objB[currentKey])) {
+      return false; // 只要有一个键值不存在或者引用不同，则不相等
+    }
+  }
+  
+  return true;
+}
+```
+
+## Ref
+
+ref在React当中可以用来获取原生DOM或者类组件的实例，前者可以让我们做一些原生DOM操作，而后者可以让我们直接调用组件实例中的public方法。
+
+```jsx
+import React, { PureComponent, createRef } from 'react'
+import HelloWorld from './HelloWorld'
+
+export class App extends PureComponent {
+  constructor() {
+    super()
+    this.h2Ref = createRef()
+    this.hwRef = createRef()
+  }
+
+  componentDidMount() {
+    console.log(`h2Ref: ${this.h2Ref.current}`)
+    console.log(`hwRef: ${this.hwRef.current}`)
+  }
+
+  sayGoodbye() {
+    this.hwRef.current.sayGoodbye()
+  }
+  render() {
+    return (
+      <>
+      <h2 ref={this.h2Ref}>h2 element</h2>
+      <HelloWorld ref={this.hwRef}></HelloWorld>
+      <button onClick={this.sayGoodbye.bind(this)}>Say Goodbye</button>
+      </>
+    )
+  }
+}
+
+export default App
+```
+
+```jsx
+import React, { PureComponent } from 'react'
+
+export class HelloWorld extends PureComponent {
+  sayGoodbye () {
+    console.log("goodbye world")
+  }
+  render() {
+    return (
+      <div>HelloWorld element</div>
+    )
+  }
+}
+
+export default HelloWorld
+```
+
+Console 输出：
+
+```
+h2Ref: [object HTMLHeadingElement]
+hwRef: [object Object]
+```
+
+点击按钮后：
+
+```
+goodbye world
+```
+
+函数式组件由于没有实例，所以无法用上面的方法进行绑定，但是函数式组件可以进行ref转发。如果想将ref绑定给函数式组件，需要用 `React.forwardRef` 包裹该组件。通过这样的方式，我们可以进一步地将ref绑定到函数式组件的某一个子元素上面。
+
+```jsx
+import React, { PureComponent, createRef } from 'react'
+import FunctionComponent from './FunctionComponent'
+
+export class App extends PureComponent {
+  constructor() {
+    super()
+    this.fcRef = createRef()
+  }
+
+  componentDidMount() {
+    console.log(`fcRef: ${this,this.fcRef}`)
+  }
+
+
+  render() {
+    return (
+      <FunctionComponent ref={this.fcRef}></FunctionComponent>
+    )
+  }
+}
+
+export default App
+```
+
+```jsx
+import React from "react";
+
+const FunctionComponent = React.forwardRef(function FunctionComponent(
+  props,
+  ref
+) {
+  return (
+    <>
+      <h2 ref={ref}>FC H2</h2>
+      <div>FC Div</div>
+    </>
+  );
+});
+
+export default FunctionComponent;
+```
+
+Console 输出：
+
+```
+fcRef: [object Object]
+```
+
+## 受控组件和非受控组件
+
+当表单元素（<input>, <textarea>, <select> 等）的值属性被绑定给一个react的state时，必须为该组件指定 `onChange` handler，在该handler中，将组件接收到的最新值时，将这个值又更新给react的state（如果不这么做，那这个表单元素将会变成一个无法输入的只读元素）。这就是双向绑定，被双向绑定的组件叫做受控组件。
+
+```jsx
+import React from 'react'
+
+export default function App() {
+  const [text, setText] = React.useState("default text");
+  return (
+    {/* 受控组件 */}
+    <input type='text' value={text} onChange={e => {setText(e.target.value)}}></input>
+    {/* 非受控组件 */}
+		<input type='text'></input>
+  )
+}
+```
+
+### 同一函数管理多个受控组件
+
+在类组件中，由于state是一个对象，所以我们可以把多个受控组件的name元素以key的形式保存在state对象当中，当表单元素的value变化，需要更新的时候，这个表单元素的event.target就指向了这个表单元素，我们可以通过`event.target.name` 拿到name元素，从而更新state对象中对应的state。
+
+```jsx
+import React, { PureComponent } from 'react'
+
+export class App extends PureComponent {
+  constructor() {
+    super()
+    this.state = {
+      username: "",
+      password: ""
+    }
+  }
+
+  onInputChanged = (event) => {
+    this.setState({
+      [event.target.name]: event.target.value // 按照event.target.name更新对应的状态
+    })
+  }
+
+  onSubmit = (e) => {
+    e.preventDefault(); // 防止以默认行为提交表单
+    console.log(`Submitted! username: ${this.state.username}, password:${this.state.password}`)
+  }
+  render() {
+    return (
+      <form onSubmit={e => this.onSubmit(e)}>
+        <label> {/* 将文本和input放在一个label当中，可以让用户点击文本的时候，也能够选中input，提高accessibility*/}
+          username:
+          <input type="text" name="username" value={this.state.username} onChange={e => this.onInputChanged(e)}/>
+        </label>
+        <label>
+          password:
+          <input type='password' name="password" value={this.state.password} onChange={e => this.onInputChanged(e)}/>
+        </label>
+        <button type='submit'>Submit</button>
+      </form>
+    )
+  }
+}
+
+export default App
+```
+
+### 其他常见的受控组件
+
+#### checkbox（单选，多选）以及 select 下拉框（单选，多选）
+
+- Checkbox 单选：值字段为 checked 而不是 value
+- Checkbox 多选：在单选基础上，需要用一个由对象组成的数组来管理状态
+- Select 单选：值字段为value，子元素为option标签，option标签的value字段就是select的值字段中的候选值
+- Select多选：在单选基础上，需要在select标签上加上 `multiple={true}`，其value字段必须是一个数组，内部存的依然是option标签中value字段里的值。
+
+```jsx
+import React, { PureComponent } from "react";
+
+export class App extends PureComponent {
+  constructor() {
+    super();
+    this.state = {
+      username: "",
+      password: "",
+      complianceChecked: false,
+      hobbies: [
+        { name: "sing", id: 0, text: "sing", checked: false },
+        { name: "dance", id: 1, text: "dance", checked: false },
+        { name: "rap", id: 2, text: "rap", checked: false },
+        { name: "basketball", id: 3, text: "basketball", checked: false },
+      ],
+      fruit: "orange",
+      beverages: ["beer"],
+    };
+  }
+
+  onInputChanged = (event) => {
+    this.setState({
+      [event.target.name]: event.target.value,
+    });
+  };
+
+  onComplianceChanged = (e) => {
+    this.setState({
+      complianceChecked: e.target.checked,
+    });
+  };
+
+  onHobbiesChanged = (e) => {
+    const newHobbies = [...this.state.hobbies];
+    newHobbies.map((hobby) => {
+      if (hobby.name === e.target.name) {
+        hobby.checked = e.target.checked;
+      }
+      return hobby;
+    });
+    this.setState({ hobbies: newHobbies });
+  };
+
+  onFruitChanged = (e) => {
+    this.setState({ fruit: e.target.value });
+  };
+
+  onBeverageChanged = (e) => {
+    this.setState({
+      beverages: Array.from(e.target.selectedOptions, (item) => item.value),
+    });
+  };
+
+  onSubmit = (e) => {
+    e.preventDefault();
+    console.log(
+      `Submitted! username: ${this.state.username}, password:${
+        this.state.password
+      }, checkedHobbies: ${this.state.hobbies
+        .filter((hobby) => hobby.checked === true)
+        .map((item) => item.text)}, fruit: ${this.state.fruit}, beverages: ${this.state.beverages}`
+    );
+  };
+  render() {
+    return (
+      <form onSubmit={(e) => this.onSubmit(e)}>
+        <div>
+          <label>
+            username:
+            <input
+              type="text"
+              name="username"
+              value={this.state.username}
+              onChange={(e) => this.onInputChanged(e)}
+            />
+          </label>
+          <label>
+            password:
+            <input
+              type="password"
+              name="password"
+              value={this.state.password}
+              onChange={(e) => this.onInputChanged(e)}
+            />
+          </label>
+        </div>
+        <label>
+          {/* checkbox 单选 */}
+          <input
+            type="checkbox"
+            name="compliance"
+            checked={this.state.complianceChecked}
+            onChange={(e) => this.onComplianceChanged(e)}
+          ></input>{" "}
+          I've known all compliance rules
+        </label>
+        <div>
+          {/* checkbox 多选 */}
+          {this.state.hobbies.map((item) => (
+            <>
+              <label htmlFor={item.name} key={item.id}>
+                <input
+                  type="checkbox"
+                  checked={item.checked}
+                  id={item.name}
+                  name={item.name}
+                  onChange={(e) => this.onHobbiesChanged(e)}
+                />
+                {item.text}
+              </label>
+            </>
+          ))}
+        </div>
+        {/* select 单选 */}
+        <select
+          value={this.state.fruit}
+          onChange={(e) => this.onFruitChanged(e)}
+        >
+          <option value="orange" key="orange">
+            Orange
+          </option>
+          <option value="banana" key="banana">
+            Banana
+          </option>
+          <option value="apple" key="apple">
+            Apple
+          </option>
+        </select>
+        {/* select 多选 */}
+        <select
+          value={this.state.beverage}
+          onChange={(e) => this.onBeverageChanged(e)}
+          multiple={true}
+        >
+          <option value="beer" key="beer">
+            Beer
+          </option>
+          <option value="wine" key="wine">
+            Wine
+          </option>
+          <option value="cola" key="cola">
+            Cola
+          </option>
+        </select>
+        <button type="submit">Submit</button>
+      </form>
+    );
+  }
+}
+
+export default App;
+
+```
+
+### 非受控组件
+
+受控组件的数据是由React的状态来管理的。而非受控组件的数据则是由DOM节点来处理。在React中，大多数情况下我们都使用受控组件。
+
+如果我们要使用非受控组件中的数据，那么我们需要使用ref来从DOM节点中获取表单数据。
+
+```jsx
+import React, { PureComponent } from "react";
+
+export class App extends PureComponent {
+  constructor() {
+    super();
+    this.inputRef = React.createRef();
+  }
+  submitHandler = (e) => {
+    e.preventDefault();
+    console.log(`current input text: ${this.inputRef.current.value} `);
+  };
+  render() {
+    return (
+      <>
+        <form onSubmit={(e) => this.submitHandler(e)}>
+          <label htmlFor="inputArea"> Input: </label>
+          <input type="text" defaultValue={'...'} ref={this.inputRef} />
+          <button type="submit">Submit</button>
+        </form>
+      </>
+    );
+  }
+}
+
+export default App;
+
+```
+
+## 高阶组件
+
+### 高阶函数
+
+至少满足以下两个条件之一的函数称为高阶函数：
+
+1. 接受一个函数或多个函数作为输入
+2. 返回一个函数
+
+JS当中的 map, filter 等等都是高阶函数
+
+### 高阶组件
+
+高阶组件定义：接收一个组件作为参数，返回值为一个新组件的函数，这样的函数就叫做高阶组件。（注意，高阶组件实质上是一个函数，而不是组件）
+
+高阶组件的意义是对传入组件的渲染进行拦截，从而在高阶组件函数内对传入的组件进行一些操作，这在需要对多个不同组件进行相同操作（如参数注入，context/gql注入或者登录鉴权）的时候非常有用。
+
+下面举一个利用高阶组件进行context注入的例子：
+
+```jsx
+// ThemeContext.js
+import React from 'react'
+
+const ThemeContext = React.createContext({});
+
+export default ThemeContext
+```
+
+```jsx
+// WithThemeContext.jsx
+import ThemeContext from "../ThemeContext";
+
+const withThemeContext = (OriginalComponent) => {
+  return (props) => (
+    <ThemeContext.Consumer>
+      {/* 利用高阶组件拦截传入组件的渲染，并为传入组件注入一个 Context Value */}
+      {(value) => <OriginalComponent {...props} {...value} />}
+    </ThemeContext.Consumer>
+  );
+};
+
+export default withThemeContext;
+```
+
+```jsx
+// App.jsx
+import React, { PureComponent } from "react";
+import withThemeContext from "./hoc/WithThemeContext";
+
+export class App extends PureComponent {
+  constructor(props) {
+    super(props);
+  }
+  render() {
+    return <h2>Theme:{this.props.theme}</h2>;
+  }
+}
+// 直接导出高阶组件
+export default withThemeContext(App);
+
+```
+
+## Portals
+
+portal是React提供的一种跨层次的渲染方式，通常，当我们从组件返回一个元素时，它会作为最近父节点的子节点挂载到 DOM 的层次结构当中。
+
+```react
+export default Father(props:IProps){
+  return (
+    <div>
+      {props.children} //该组件会直接作为Father的子组件挂载在DOM当中
+    </div>
+  );
+}
+```
+
+但是，在某些情况下，我们需要把子组件直接渲染到DOM当中其他层次的位置当中去，比如说对话框、悬浮卡片、工具提示等需要突破原有容器的场景，这个时候我们就需要直接把子组件插入到其他层次的节点当中进行渲染，这时候就需要用到React中的Portal
+
+```react
+import ReactDOM from 'react-dom'
+ReactDOM.createPortal(child, container)
+```
+
+其中，child就是直接可渲染的一个组件，container就是一个已存在于DOM的组件，child将被挂载到这个container下
+
+```html
+<!--index.html-->
+<html>
+  ...
+  <body>
+    ...
+    <div id="root"></div>
+    <div id="lhy"></div>
+  </body>
+</html>
+```
+
+```jsx
+import React, { memo } from 'react'
+import { createPortal } from 'react-dom'
+
+const App = memo(() => {
+  return (
+    <div className='aaa'>
+        <h2>H2</h2>
+        {
+            createPortal(<h3>H3</h3>, document.getElementById('lhy'))
+        }
+    </div>
+  )
+})
+
+export default App
+```
+
+运行结果：
+
+![image-20231213224941930](./React.assets/image-20231213224941930.png)
+
+
+
+## 严格模式
+
+`<StrictMode>` 是一个用来突出显示应用程序中存在的潜在问题的工具，它在React当中以组件的形式存在的：
+
+1. 严格模式不会渲染额外的UI
+2. 为后代元素触发额外的检查和警告
+3. 仅在开发环境下有用，不会影响生产环境
+
+严格模式主要检查：
+
+1. 识别过时和不安全的函数（如过时的生命周期函数，Ref API等等）
+2. 检查意外的副作用：严格模式下的**组件在初次挂载的时候会渲染两次**
+   - 如果在挂载的时候添加了一些副作用，同时我们忘记在取消挂载的时候删除这些副作用，如果我们在这两个生命周期中有一些console输出，那渲染两次会让我们更清楚地在console中看到此类错误。
+
+## 过渡动画
+
+组件的过渡动画是指伴随组件状态变化过程的动画，这个状态变化可以是组件在消失/出现之间的转变，也可能是新/旧组件之间的更替。
+
+React当中，我们可以使用官方社区维护的包 `react-transition-group` 来为组件添加过渡动画。
+
+该库的官方文档地址：[React Transition Group](https://reactcommunity.org/react-transition-group/transition)
+
+``` cmd
+npm install react-transition-group
+```
+
+### CSSTransition
+
+如果我们想使用CSS来控制过渡动画的行为，那么就需要使用 `CSSTransition`，它以组件形式存在于React当中，在我们只控制单个组件的消失/出现过渡动画的时候，可以单独使用这个过渡动画组件将我们的目标组件包裹起来。在其他时候，该过渡动画组件可以配合 `SwitchTransition` 和 `TransitionGroup` 实现更多的过渡动画效果。
+
+CSSTransition的过渡动画执行过程中，有三个状态：
+
+1. appear：这是组件在初次挂载时，从未显示到显示的状态
+2. enter：这是组件从未显示到显示的状态
+3. exit：这是组件从显示到未显示到状态
+
+这三个状态，都分别包含三个过程，为这三个过程我们需要定义对应的CSS样式：
+
+- 第一个过程 - 预备开始执行动画，对应的CSS类是：`-appear` , `-enter`, `-exit`
+- 第二个过程 - 开始执行动画，对应的CSS类是：`-appear-active` , `-enter-active`, `-exit-active`
+- 第三个过程 - 执行动画结束，对应的CSS类是：`-appear-done` , `-enter-done`, `-exit-done`
+
+一般来说，第一个过程定义了动画初始状态，第二个过程定义了动画结束时的状态、变化需要的时间以及如何变化。第三个过程在动画结束后，为组件添加对应的额外样式。
+
+CSSTransition 有几个关键的参数：
+
+1.  `in` ：表明被包裹的组件是显示还是未显示
+
+2. `timeout`：整个过渡动画最大时间，以毫秒为单位，这个值最好跟CSS中每个状态的过渡动画的执行时间一致
+
+3. `classNames`：CSS类名，这个类名的设置比较特殊，如果我为其赋值为`lhy` ，那么在CSS文件中，我只需要像如下这样写就可以完成对三个状态的过渡动画执行过程的CSS样式的定义，在运行时，CSSTransition会根据组件的状态自行改变组件的CSS类
+
+4. `nodeRef` ：目标组件的引用，如果不填写该参数，CSSTransition 会使用过时的API `findDomNode` 来寻找被目标组件，来改变它的CSS样式。填写该参数有助于规避该风险
+
+   ```css
+   .lhy-appear {
+   	...
+   }
+   
+   .lhy-appear-active {
+     ...
+   }
+   
+   .lhy-enter {
+     ...
+   }
+   
+   .lhy-enter-active {
+     ...
+   }
+   
+   .lhy-exit {
+     ...
+   }
+   
+   .lhy-exit-active {
+     ...
+   }
+   ```
+
+   
+
+下面展示使用 CSSTransition 为一个文本标签实现 消失/出现 过渡动画的例子
+
+```jsx
+import React, { PureComponent, createRef } from 'react'
+import { CSSTransition } from 'react-transition-group'
+import "./style.css"
+
+export class App extends PureComponent {
+  constructor(props) {
+    super(props)
+    this.state = {
+      isShow: true
+    }
+    this.h2Ref = createRef(null)
+  }
+  render() {
+    return (
+      <>
+      <button onClick={() => this.setState({isShow: !this.state.isShow})}>Toggle</button>
+      <CSSTransition in={this.state.isShow} classNames="lhy" timeout={1000} unmountOnExit={true} refNode={this.h2Ref}>
+        <h2 ref={this.h2Ref}>Hahahahaha</h2>
+      </CSSTransition>
+      </>
+    )
+  }
+}
+
+export default App
+```
+
+```css
+.lhy-appear {
+  opacity: 0;
+}
+
+.lhy-appear-active {
+  opacity: 1;
+  transition: opacity 1s ease;
+}
+
+.lhy-enter {
+  opacity: 0;
+}
+
+.lhy-enter-active {
+  opacity: 1;
+  transition: opacity 1s ease;
+}
+
+.lhy-exit {
+  opacity: 1;
+}
+
+.lhy-exit-active {
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+```
+
+### SwitchTransition
+
+当组件的状态变化时，我们想用过渡动画来展示两种不同状态下的组件变换的过程，这个时候就可以用SwitchTransition。
+
+SwitchTransition的需要和CSSTransition配合起来使用。SwitchTransition需要包裹CSSTransition，而CSSTransition又包裹目标组件。和单独使用CSS时最大的不同点在于，CSSTransition不再使用 `in` 参数，而是变成了 `key` 参数，我们需要为每种状态下的组件绑定一个独一无二 key，同时也需要绑定独一无二的ref
+
+```jsx
+import React, { PureComponent, createRef } from "react";
+import { SwitchTransition, CSSTransition } from "react-transition-group";
+import "./style.css";
+
+export class App extends PureComponent {
+  constructor(props) {
+    super(props);
+    this.state = {
+      isLogin: false,
+    };
+    this.exitRef = createRef(null);
+    this.loginRef = createRef(null);
+    this.nodeRef = this.state.isLogin ? this.loginRef : this.exitRef;
+  }
+  render() {
+    return (
+      <SwitchTransition>
+        <CSSTransition
+          key={this.state.isLogin ? "exit" : "login"}
+          classNames="login"
+          timeout={1000}
+          nodeRef={this.nodeRef}
+        >
+          <button
+            onClick={() => this.setState({ isLogin: !this.state.isLogin })}
+            ref={this.nodeRef}
+          >
+            {this.state.isLogin ? "Logout" : "Login"}
+          </button>
+        </CSSTransition>
+      </SwitchTransition>
+    );
+  }
+}
+
+export default App;
+
+```
+
+```css
+.login-enter {
+  transform: translateX(100px);
+  opacity: 0;
+}
+
+.login-enter-active {
+  transform: translateX(0);
+  opacity: 1;
+  transition: all 1s ease;
+}
+
+.login-exit {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.login-exit-active {
+  transform: translateX(-100px);
+  opacity: 0;
+  transition: all 1s ease;
+}
+
+```
+
+### TransitionGroup
+
+当我们的数据以列表的形式展现，而我们想为列表中的每一条数据的增加/删除都添加过渡动画时，使用TransitionGroup是再好不过了。TransitionGroup的使用方法和SwitchTransition基本类似，需要和CSSTransition配合使用，同时需要为每个CSSTransition分配独一无二的key和ref。
+
+TransitionGroup可以接受一个叫component的参数，这个参数可以指定列表元素的父组件类型，默认为div，但我们通常都会使用ul标签。
+```jsx
+import React, { PureComponent, createRef } from "react";
+import { TransitionGroup, CSSTransition } from "react-transition-group";
+import { v4 as uuid } from "uuid";
+import "./style.css";
+
+const FAKE_BOOK_NAME = "Book";
+const FAKE_BOOK_PRICE = 100;
+export class App extends PureComponent {
+  constructor(props) {
+    super(props);
+    this.state = {
+      books: [
+        {
+          bookName: FAKE_BOOK_NAME,
+          price: FAKE_BOOK_PRICE,
+          nodeRef: createRef(null),
+          id: uuid(),
+        },
+        {
+          bookName: FAKE_BOOK_NAME,
+          price: FAKE_BOOK_PRICE,
+          nodeRef: createRef(null),
+          id: uuid(),
+        },
+      ],
+    };
+  }
+
+  addBook = () => {
+    const newBooks = [...this.state.books];
+    newBooks.push({
+      bookName: FAKE_BOOK_NAME,
+      price: FAKE_BOOK_PRICE,
+      nodeRef: createRef(null),
+      id: uuid(),
+    });
+    this.setState({ books: newBooks });
+  };
+
+  deleteBook = (id) => {
+    const newBooks = [...this.state.books].filter((book) => book.id !== id);
+    this.setState({ books: newBooks });
+  };
+  render() {
+    return (
+      <>
+        <h3>Books</h3>
+        <TransitionGroup component="ul">
+          {this.state.books.map((book) => (
+            <CSSTransition
+              key={book.id}
+              nodeRef={book.nodeRef}
+              timeout={1000}
+              classNames="book"
+            >
+              <li ref={book.nodeRef} key={book.id}>
+                <span>
+                  {book.id} - {book.bookName} - {book.price}
+                </span>
+                <button
+                  onClick={() => this.deleteBook(book.id)}
+                  className="deleteButton"
+                >
+                  delete
+                </button>
+              </li>
+            </CSSTransition>
+          ))}
+        </TransitionGroup>
+        <button onClick={() => this.addBook()}>Add</button>
+      </>
+    );
+  }
+}
+
+export default App;
+
+```
+
+```css
+.book-enter {
+  transform: translateX(100px);
+  opacity: 0;
+}
+
+.book-enter-active {
+  transform: translateX(0);
+  opacity: 1;
+  transition: all 1s ease;
+}
+
+.book-exit {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.book-exit-active {
+  transform: translateX(-100px);
+  opacity: 0;
+  transition: all 1s ease;
+}
+
+.deleteButton {
+  margin-left: 4px;
+}
+```
+
+
+
+## 重渲染 (re-render)
 
 重渲染前提：
 
@@ -254,47 +1577,14 @@ type IProps = {
 
 ## Portals
 
-portal是React提供的一种跨层次的渲染方式，通常，当我们从组件返回一个元素时，它会作为最近父节点的子节点挂载到 DOM 的层次结构当中。
 
-```react
-export default Father(props:IProps){
-  return (
-    <div>
-      {props.children} //该组件会直接作为Father的子组件挂载在DOM当中
-    </div>
-  );
-}
-```
-
-但是，在某些情况下，我们需要把子组件直接渲染到DOM当中其他层次的位置当中去，比如说对话框、悬浮卡片、工具提示等需要突破原有容器的场景，这个时候我们就需要直接把子组件插入到其他层次的节点当中进行渲染，这时候就需要用到React中的Portal
-
-```react
-import ReactDOM from 'react-dom'
-ReactDOM.createPortal(child, container)
-```
-
-其中，child就是直接可渲染的一个组件，container就是一个已存在于DOM的组件，child将被挂载到这个container下
 
 ```html
-<html>
-  <body>
-    <div id="app-root"></div>
-    <div id="modal-root"></div>
-  </body>
-</html>
+
 ```
 
 ```react
-  // React does *not* create a new div. It renders the children into `domNode`.
-  // `domNode` is any valid DOM node, regardless of its location in the DOM.
-export default Father(props:IProps){
-  const containerNode = document.getElementByID('modal-root')!
-  return (
-    <div>
-      ReactDOM.createPortal(props.children, containerNode)
-    </div>
-  );
-}
+
 ```
 
 ## Non-null assertion
@@ -651,7 +1941,7 @@ export const TestComponent: React.FC<IProps> = (props) => {
 
 useRef 可以用来直接获取原生DOM节点的引用
 
-```typescript
+```tsx
 import React, { useRef, useState } from "react";
 
 export const TestComponent: React.FC<IProps> = (props) => {
@@ -666,7 +1956,7 @@ export const TestComponent: React.FC<IProps> = (props) => {
 ```
 
 ```react
-export const ChildrenComponent = React.forwardRef((props, ref) => {
+export const TestInput = React.forwardRef((props, ref) => {
     return (
         <input ref={ref}></input>
     )
@@ -743,38 +2033,4 @@ export function useBeer(beerType: string) {
 ```
 
 这个自定义Hook接收一个啤酒类别的参数，然后获取啤酒的实时价格，然后返回啤酒的价格state以及一个可以改变价格的函数和loading状态
-
-## 状态提升
-
-在react当中，只有一条data flow，那就是从parent组件传递到child组件，如果想让child给parent传递信息，或者说同级组件之间传递信息，那么就需要用到状态提升。
-
-状态提升是一种让两个非父子关系的组件进行通讯的方法。
-
-简单说：状态提示就是让两个组件拥有同一个parent，然后把这两个兄弟组件直接通讯需要的状态都存在parent组件里面
-
-```react
-export const ParentComponent:React.FC<IParentProps> = (props) => {
-    const [num, setNum] = setState(0) // 状态提升，Alpha和Beta通讯的状态被存储在共同的parent组件中
-    const numIncrement = (n: number) => {
-        setNum(n)
-    }
-    return (
-    	<ChildComponentAlpha num={num}></ChildComponentAlpha>
-        <ChildComponentBeta numIncrement={numIncrement}></ChildComponentBeta>
-    )
-}
-
-
-export const ChildComponentAlpha: React.FC<IAlphaProps> = ({num}) => {
-    return (<div>The current num is: {num} </div>) //ChildAlpha显示ChildBeta设置的随机数
-}
-
-export const ChildComponentBeta: React.FC<IBetaProps> = ({numIncrement}) => {
-    const randomNumber = Math.floor(Math.random() * 100) // ChildBeta使用一个随机数与ChildAlpha通讯
-    const clickHandler = () => {
-        numIncrement(randomNumber);
-    }
-    return (<button onclick={clickHandler}>Click Me!</button>)
-}
-```
 
