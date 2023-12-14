@@ -733,7 +733,7 @@ fcRef: [object Object]
 
 ## 受控组件和非受控组件
 
-当表单元素（<input>, <textarea>, <select> 等）的值属性被绑定给一个react的state时，必须为该组件指定 `onChange` handler，在该handler中，将组件接收到的最新值时，将这个值又更新给react的state（如果不这么做，那这个表单元素将会变成一个无法输入的只读元素）。这就是双向绑定，被双向绑定的组件叫做受控组件。
+当表单元素（`<input>, <textarea>, <select>` 等）的值属性被绑定给一个react的state时，必须为该组件指定 `onChange` handler，在该handler中，将组件接收到的最新值时，将这个值又更新给react的state（如果不这么做，那这个表单元素将会变成一个无法输入的只读元素）。这就是双向绑定，被双向绑定的组件叫做受控组件。
 
 ```jsx
 import React from 'react'
