@@ -1575,18 +1575,6 @@ type IProps = {
 }
 ```
 
-## Portals
-
-
-
-```html
-
-```
-
-```react
-
-```
-
 ## Non-null assertion
 
 当一个变量可能为undefined或者null的时候，在typescript中需要做额外的类型检查才能避免类型报错。
