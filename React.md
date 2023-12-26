@@ -613,6 +613,8 @@ function shallowEqual(objA, objB) {
 }
 ```
 
+JS当中有许多第三方的库可以提供“数据不可变”，比如 immutable-js 和 immer 等。这类库会改变 js 存储数据的结构，当我们修改某一复杂对象的字段时，它能通过低开销的手法，自动创建一个新的对象，而不会去修改老对象。
+
 ## Ref
 
 ref在React当中可以用来获取原生DOM或者类组件的实例，前者可以让我们做一些原生DOM操作，而后者可以让我们直接调用组件实例中的public方法。
@@ -1440,6 +1442,901 @@ export default App;
 }
 ```
 
+## CSS 解决方案
+
+由于React是组件化开发模式，而CSS的设计就不是为组件化而生的，它是以全局为作用域的。因此我们需要新的CSS方案来支持组件化开发的模式，这个新方案应该能够支持以下内容：
+
+1. 可以编写局部CSS：CSS具备自己的作用域，不会随意污染作用域外的组件的样式
+2. 可以编写动态的CSS：可以获取当前组件的一些状态，根据状态的变化生成不同的CSS样式
+3. 支持所有的CSS特性：伪类、动画、媒体查询等
+4. 编写简洁，符合CSS等风格特点
+
+### 内联样式
+
+内联样式通过给组件加上一个 `style` 参数，然后传入一个JS对象，对象里的样式值可以动态引用组件状态。
+
+``` jsx
+import React, { PureComponent } from "react";
+
+export class InlineStyle extends PureComponent {
+  constructor() {
+    super();
+    this.state = {
+      isToggled: false,
+    };
+  }
+  render() {
+    return (
+      <div
+        style={{ color: this.state.isToggled ? "red" : "green", fontSize: "24px" }} // 内联样式
+        onClick={() => this.setState({ isToggled: !this.state.isToggled })}
+      >
+        InlineStyle
+      </div>
+    );
+  }
+}
+
+export default InlineStyle;
+```
+
+- 优点
+  1. 内联样式只影响一个组件，样式之间不会有冲突
+  2. 可以动态获取组件的state
+- 缺点
+  1. 写法上需要使用驼峰命名（JS不支持 `font-size` 这样的dash line写法)
+  2. 某些样式没有提示
+  3. 大量的样式，使得代码混乱
+  4.  某些样式无法编写（如伪类/伪元素）
+
+### 普通CSS
+
+在这种方式中，我们通常会编写一个单独的CSS文件，之后再进行引入。
+
+但是，这样的编写方式和普通的网页开发的编写方式是一致的，**每个CSS文件中编写的样式都是全局样式，样式之间会相互产生影响**。这种编写方式最大的问题就是样式之间的效果会相互覆盖掉。
+
+``` jsx
+import React, { PureComponent } from 'react'
+import "../style/style.css"
+
+export class NormalStyle extends PureComponent {
+  render() {
+    return (
+      <div className='fancy-label'>NormalStyle</div>
+    )
+  }
+}
+
+export default NormalStyle
+```
+
+```css
+.fancy-label {
+  color: aqua;
+  font-size: 30px;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.fancy-label:hover {
+  color: blueviolet;
+}
+```
+
+### CSS Modules
+
+CSS Modules 通过将 CSS 文件包装成一个独立的模块，从而支持局部作用域。这并不是 React 特有的解决方案，而是所有使用了类似于webpack配置的环境下都可以使用的方案。
+
+React的脚手架中已经内置了CSS Modules的配置，不需要额外做任何配置。
+
+- .css/.less/.scss 等样式文件都需要修改成 .module.css/.module.less/.module.scss。
+- 之后就可以在组件中引用并且使用了
+
+![image-20231217162420302](./React.assets/image-20231217162420302.png)
+
+``` css
+/* Home.module.css */
+.title {
+  font-size: 32px;
+  color: orange;
+}
+```
+
+```jsx
+// Home.jsx
+import React, { PureComponent } from "react";
+import homeStyle from "./Home.module.css"; // 跟普通的CSS引入不同，这里会直接引入一个对象
+
+export class Home extends PureComponent {
+  render() {
+    return <div className={homeStyle.title}>Home</div>;  // 我们在CSS文件中写的类，可以通过这个引入对象中的一个字段拿到
+  }
+}
+
+export default Home;
+```
+
+```css
+/* Profile.module.css */
+.title {
+  font-size: 20px;
+  color: red;
+}
+```
+
+``` jsx
+// Profile.jsx
+import React, { PureComponent } from "react";
+import profileStyles from "./Profile.module.css";
+
+export class Profile extends PureComponent {
+  render() {
+    return <div className={profileStyles.title}>Profile</div>;
+  }
+}
+
+export default Profile;
+```
+
+最后的运行效果，可见每个CSS Module都维护了一个自己的作用域：
+
+![image-20231217162747360](./React.assets/image-20231217162747360.png)
+
+但是，CSS Modules 仍然存在一些缺陷：
+
+1. CSS中的类名，不能使用横杠符号作为连接 (如 `.home-title`)，这在JavaScript中是不能识别的
+2. 不方便结合组件state来动态修改某些样式
+
+### Styled Components
+
+ Styled Components 提供了一种全新的CSS解决方案，那就是所谓的 `CSS in JavaScript` 。它通过将样式绑定到HTML原生元素或者继承给其他组件的方式，返回一个新组件，这个组件中就包含了我定义的样式，我们通过调用该组件，就可以我们定义的样式应用到它自己及后代组件的身上。
+
+这种方式非常的灵活，它在提供局部作用域的同时，又能够非常方便地结合组件的状态来对样式进行动态调整，更重要的是它完美契合了React框架的设计思路。但这种方式目前在业界有褒有贬，而且它并不是由React官方所维护的，而是一个第三方库。
+
+要使用 Styled Components，首先要安装并引入该库
+
+`npm install styled-components`
+
+---
+
+在正式介绍该库之前，需要说明一下关于使用“标签模版字符串”来调用函数的知识：
+
+标签模版字符串是ES6的新特性:  
+
+```javascript
+const name = 'lhy'
+const str = `my name is ${name}`
+```
+
+我们可以通过标签模板字符串来对函数进行调用：
+
+```javascript
+function foo(...args) {
+    console.log(args)
+}
+const firstParam = "lhy"
+const secondParam = "26"
+foo`section one: ${firstParam}, section two: ${secondParam}`
+
+// 控制台输出
+// [LOG]: [["section one: ", ", section two: ", ""], "lhy", "26"]
+// 可以看到，输出是一个数组，这个数组可以分为两个部分，一部分是静态部分，就是那些写死的部分，第二部分是动态部分，也就是我们传入的参数
+// 静态部分是一个数组，里面有三个元素，这三个元素是按照传入参数的位置分割而得到的
+// 动态部分则是将我们传入的参数作为输出数组的元素，依次排列
+```
+
+---
+
+Styled Component就是通过这种字符串模板调用函数的方式来运用的。
+
+首先，我们需要定义一个.js文件，这个文件会暴露所有绑定好样式的组件。
+
+以 `AppWrapper` 为例子，我们调用了 `styled.div` 这个函数，说明这个组件最后返回的是一个绑定好样式的 DIV 组件。在模板字符串中，我们需要对它的样式进行定义，这里的定义跟 less 非常像，是通过嵌套的方式进行定义的，`.footer` 就代表了这个组件的子组件中，className 为 footer 的组件，会应用这个样式。
+
+在 `SectionWrapper` 当中，我们可以看到 `contentFontSize` 这个属性的值是从外部传进来的，因为返回的是组件，所以我们理所当然地可以对这个组件传递参数，传递的参数我们可以在 props 中通过箭头函数的方式拿到。同时，如果我们要给自身设置伪类，可以像 `$:hover` 这样来做
+
+```javascript
+// app-wrapper.js
+import styled from "styled-components";
+
+export const AppWrapper = styled.div`
+  border: 10px green;
+  padding: 5%;
+
+  .footer {
+    background-color: aqua;
+  }
+`;
+
+export const SectionWrapper = styled.div`
+  border: 2px red solid;
+
+  .title {
+    font-size: 32px;
+    color: blue;
+  }
+
+  .content {
+    font-size: ${(props) => props.contentFontSize}px;
+  }
+
+  &:hover {
+    background-color: yellow;
+  }
+`;
+
+export const UIButton = styled.button`
+  border: 0px;
+  background-color: purple;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 20px;
+  color: white;
+
+  &:hover {
+    filter: brightness(0.5);
+  }
+`;
+
+```
+
+``` jsx
+// App.jsx
+import React, { PureComponent } from "react";
+import {
+  AppWrapper,
+  SectionWrapper,
+  UIButton,
+} from "./styled-components/app-wrapper";
+
+export class App extends PureComponent {
+  constructor() {
+    super();
+    this.state = {
+      contentFontSize: 30,
+    };
+  }
+  render() {
+    return (
+      <AppWrapper>
+        <SectionWrapper contentFontSize={this.state.contentFontSize}> {/*向 styled component 里传入参数*/}
+          <div className="title">This is the title in section</div>
+          <span className="content">This is the content in section</span>
+        </SectionWrapper>
+        <div className="footer">This is the footer</div>
+        <UIButton
+          onClick={() =>
+            this.setState({ contentFontSize: this.state.contentFontSize + 1 }) {/* style component 仍然会保留组件原来的参数和功能，只是为其嵌入样式 */}
+          }
+        >
+          Font Size +
+        </UIButton>
+      </AppWrapper>
+    );
+  }
+}
+
+export default App;
+
+```
+
+### Classname 类库
+
+React当中，给组件添加一个class是非常方便的，我们可以结合组件的状态，通过三元等逻辑运算，判断要给组件加上哪一个class：
+
+```jsx
+<div className={"title" + (isActive ? "active" : "inactive")}>Test</div>
+```
+
+但是，当组件较为复杂或者一个组件需要管理的class类太多的时候，这种方式会让代码显得非常的混乱
+
+```jsx
+<div className={"title" + (isActive ? "active" : "inactive") + {isFocus ? "focus" : ""} + (isInPrivateMode ? "private" : "public")}>Test</div>
+```
+
+在这种情况下，我们可以使用 `classNames` 的库来让这种添加类的逻辑变得更加的简洁，提高可读性。
+![image-20231217185221213](./React.assets/image-20231217185221213.png)
+
+可以看到，这个库其实就是提供了一个函数，然后返回一个字符串，传入的参数就是我们定义的选择类的条件。
+
+示例代码：
+
+```css
+.section {
+  font-size: 32px;
+  border: 2px purple;
+}
+
+.section.active {
+  background-color: green;
+}
+
+.section.non-active {
+  background-color: red;
+}
+
+.section.focus {
+  filter: opacity(0.5);
+}
+```
+
+```jsx
+import React, { PureComponent } from "react";
+import classNames from "classnames";
+import "./app.css"
+
+export class App extends PureComponent {
+  constructor() {
+    super();
+
+    this.state = {
+      isActive: false,
+      isFocus: false,
+    };
+  }
+  render() {
+    const { isActive, isFocus } = this.state;
+    return (
+      <>
+        <div
+          {/* 使用 classNames 库管理CSS类的选择 */}
+          className={classNames(
+            "section",
+            { active: isActive },
+            { "non-active": !isActive },
+            { focus: isFocus }
+          )}
+        >
+          Section: testing classNames module!!!
+        </div>
+        <button
+          onClick={() => this.setState({ isActive: !this.state.isActive })}
+        >
+          Change Active
+        </button>
+        <button onClick={() => this.setState({ isFocus: !this.state.isFocus })}>
+          Change Focus
+        </button>
+      </>
+    );
+  }
+}
+
+export default App;
+
+```
+
+## Redux
+
+### 纯函数
+
+在程序设计中，若一个函数符合以下条件，那么这个函数就被称为纯函数：
+
+1. 此函数在相同的输入值下，会产生相同的输出
+2. 函数的输出与输入值以外的其他信息和状态无关，也和有IO设备产生的外部输出无关。
+3. 该函数不能有语义上可观察到副作用，诸如”网络请求“，”触发事件“，”使输出设备输出“或者”更改输出值以外的内容“等。
+
+简洁的说，即：
+
+1. 同一输入必然导致同一输出
+2. 函数执行过程中不能产生任何副作用。
+
+``` javascript
+// 纯函数
+function foo1(num) {
+  return num + 10
+}
+
+let count = 10
+// 不是纯函数, 返回值依赖与输出无关的信息，如果执行几次该函数之后，count的值改变，那下一次同一输入将得到不同输出
+function foo2(num) {
+  return num + count
+}
+
+// 不是纯函数，因为它更改了输出值以外的内容
+function foo3(obj) {
+  obj.name = "lhy"
+}
+```
+
+React当中强调：无论是使用函数组件还是类组件，这个**组件都必须像纯函数一样运行，它们的props不应该被修改**。
+
+在Redux当中，reducer被要求必须是一个纯函数。
+
+### 为何需要Redux
+
+JavaScript需要管理的状态越来越多，也越来越复杂。包括服务器返回的数据、缓存数据、用户操作产生的数据，也包括一些UI的状态等等，这些状态之间有可能还会相互依赖和影响，一个状态的变化会引起另一个状态的变化。
+
+在这种情况下，state在什么时候，因为什么原因发生了变化，发生了怎样的变化，会变得非常难以追踪和控制。
+
+React主要是在视图层帮我们解决了DOM的渲染过程，但是页面的状态管理依然是留给了我们自己来做。
+
+因此，Redux就是**一个帮助我们管理state的容器**，它是JavaScript的状态容器，提供了**可预测的状态管理**。
+
+![image-20231220210149666](./React.assets/image-20231220210149666.png)
+
+### Redux三大核心概念
+
+#### Store
+
+Store 是 Redux 中存放状态的模块。Store 不会接受外部传入的状态，它所有的状态更新仅依赖于单一源，那就是Reducer。Reducer每次的返回值都会用来更新Store中的状态。
+
+Store 有三个最主要的作用：
+
+1. `store.getState()`: 获取当前的状态
+2. `store.dispatch(action)`: 将action派发给reducer，更新状态
+3. `store.subscribe(callback)`: 订阅状态更新，以便UI随时能够拿到最新状态
+
+#### Action
+
+Action 是一个 JS 对象，它的作用是描述更新状态的动作，包括更新什么状态以及如何更新。
+
+Action 通常由 type 和 payload 两个字段组成，type是用来描述这个action的目的，而payload包含了执行这个action所需要的数据。
+
+Reducer 会通过传入的 Action 的 type 来判断应该如何处理这一次更新。
+
+#### Reducer
+
+Reducer 一个纯函数，它是真正处理状态更新的地方，UI组件会通过 store 将一个 action 派发给 reducer，reducer 最后会根据 action 的 类型和数据来更新 state，reducer 最后会返回一个 state 对象，这个 state 对象会用于 store 里的状态更新。
+
+### 手动实现Redux
+
+在早期，并没有封装好的 Redux 工具库，所以往往需要手动实现 Redux。实现最简单的 Redux 有一个标准的模式，在这个模式下，Redux 被放在一个模块里，这个模块一共包含四个文件。
+
+下面实现一个简单例子，利用 Redux 管理一个状态，这个状态中仅包含一个 counter 数字，同时提供加和减的更新状态方法。
+
+#### index.js
+
+index.js 是模块的入口，在这里我们创建 store，并把reducer作为参数传入store，同时把 actionCreators 和 store 导出。
+
+```js
+import { legacy_createStore as createStore } from "redux";
+import reducer from "./reducer";
+import { addCounter, reduceCounter } from "./actionCreators";
+
+const store = createStore(reducer);
+
+export { addCounter, reduceCounter };
+export default store;
+```
+
+#### actionCreators.js
+
+actionCreators 顾名思义，是创建 action 的一堆函数，它接受新的状态值，并返回一个 action 对象。
+
+```js
+import {
+  ADD_COUNTER,
+  REDUCE_COUNTER,
+} from "./constants";
+import axios from "axios";
+
+export const addCounter = (num) => {
+  return { type: ADD_COUNTER, num };
+};
+
+export const reduceCounter = (num) => {
+  return { type: REDUCE_COUNTER, num };
+};
+```
+
+#### constants.js
+
+由于 action 中的 type 会在多个地方复用，所以统一存在该文件中。
+
+```js
+export const ADD_COUNTER = "add_counter"
+export const REDUCE_COUNTER = "reduce_counter"
+```
+
+#### reducer.js
+
+reducer.js 就是定义 reducer 函数的地方，值得注意的是，初始的状态也必须由reducer返回。
+
+```js
+import {
+  ADD_COUNTER,
+  REDUCE_COUNTER,
+} from "./constants";
+
+const initialState = {
+  counter: 0,
+};
+
+const reducer = (prevState = initialState, action) => {
+  switch (action.type) {
+    case ADD_COUNTER:
+      return { ...prevState, counter: prevState.counter + action.num };
+
+    case REDUCE_COUNTER:
+      return { ...prevState, counter: prevState.counter - action.num };
+
+    default:
+      return prevState;
+  }
+};
+
+export default reducer;
+```
+
+在UI组件当中，我们可以订阅store来随时获取最新的状态，同时使用store的dispatch方法来更新状态：
+
+```jsx
+...    
+		constructor(props) {
+      super(props);
+      this.dispose = null;
+      this.state = {
+        counter: store.getState().counter, // 初始化状态
+      };
+    }
+
+    componentDidMount() {
+      this.dispose = store.subscribe(() => {
+        this.setState({ counter: store.getState().counter }); // 订阅状态更新
+      });
+    }
+
+    componentWillUnmount() {
+      this.dispose();
+    }
+
+
+    clickHandler = (num) => {
+      store.dispatch(reduceCounter(num)); // 通过dispatch更新状态
+    };
+```
+
+### Connect
+
+从上面的UI组件代码不难看出，如果每一个组件都要使用Redux里面的状态，那每一个组件都要初始化、订阅store、dispatch更新状态这一繁琐操作，这明显是能够重构提高复用性的部分。
+
+复用的方案就是使用高阶组件，但是React中已经有成熟的方案可以使用，这个方案就是 connect。它来自于 'react-redux' 这个库
+
+```jsx
+// index.jsx
+import React from "react";
+import ReactDOM from "react-dom/client";
+// import App from './App';
+import App from "./apps/redux/App";
+import store from "./apps/redux/store";
+import { Provider } from "react-redux"; // 引入Provider
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(
+  <Provider store={store} > {/* 用 Provider 包裹需要使用store里的状态的组件 */}
+    <App />
+  </Provider>
+);
+
+```
+
+然后，假设我们有一个组件叫做 `<About/>`，它要使用store里的状态，我们可以在它的类组件的外部定义两个函数，像下面这样：
+
+```jsx
+// About.jsx
+
+// 这个函数的作用，是把store.getState()里的状态，映射到组件的props里，按需来取
+const mapStateToProps = (state) => ({ 
+  counter: state.counter,
+  banners: state.banners,
+  recommends: state.recommends,
+});
+
+// 这个函数的作用，是将dispatch包装成更新状态的函数，并将其映射到组件的props里
+const mapDispatchToProps = (dispath) => ({
+  addNum: (num) => dispath(addCounter(num)),
+  reduceNum: (num) => dispath(reduceCounter(num)),
+  fetchData: () => dispath(fetchData()),
+});
+
+// connect是一个高阶函数，它接收上面两个函数作为输入，返回一个**高阶组件**
+// 这个高阶组件接受一个组件作为输入，一个新组件作为输出
+// 在 About 组件中，我们可以直接在其props中使用刚才映射的那些状态和状态更新方法
+export default connect(mapStateToProps, mapDispatchToProps)(About);
+```
+
+### Redux 中的异步操作
+
+很多时候，一个组件中的状态可能来自于一些异步操作，比如网络请求。在不使用Redux的情况下，我们通常是将网络请求放在类组件的componentDidMount函数中进行处理。但是既然使用了 Redux，那么这些网络请求之后得到的状态也应该由Redux统一管理。
+
+但现在会发现，Redux中似乎没有一个这样的地方来给我们发送这个网络请求。首先我们肯定不可能放在reducer里面，因为reducer是一个纯函数，它不可能包含网络请求这样的副作用。
+
+如果放在actionCreators里面，我们会发现，这是一个异步函数，它只能返回一个Promise对象而不是一个 action 对象，而 `store.dispatch` 是不能接受一个 Promise作为输入的。
+
+在这里，我们需要引入中间件来解决这个问题
+
+#### 中间件
+
+中间件的目的是在派发action和到达reducer这两个时间点之间，扩展一些代码：比如日志记录、调用异步借口、添加调试功能等等。
+
+React 官方推荐的包括网络请求的中间件就是使用 redux-thunk。
+
+默认情况下，`store.dispatch` 需要传入一个 JS 对象。redux-thunk可以让 dispatch 接收一个函数，我们称这个函数为 action 函数。
+
+action函数在传入dispatch之后会被调用，它会接收两个参数，一个是store的 dispatch 函数，一个是store的 getState 函数。
+
+- dispatch函数在我们的异步请求完成之后进行调用，用于派发action
+- getState函数是考虑到我们在异步请求完成后，可能会需要一些当前的状态配合计算action对象。
+
+下面演示如何使用 redux-thunk：
+
+```js
+// index.js
+import { legacy_createStore as createStore, applyMiddleware } from "redux"; // 引入 applyMiddleware
+import reducer from "./reducer";
+import { addCounter, reduceCounter } from "./actionCreators";
+import { thunk } from "redux-thunk"; // 引入thunk
+
+const store = createStore(reducer, applyMiddleware(thunk)); // 构建store的时候，传入应用thunk中间件的参数
+
+export { addCounter, reduceCounter };
+export default store;
+
+```
+
+```js
+// actionCreators.js
+import {
+  ADD_COUNTER,
+  REDUCE_COUNTER,
+  UPDATE_BANNERS,
+  UPDATE_RECOMMENDS,
+} from "./constants";
+import axios from "axios";
+
+export const addCounter = (num) => {
+  return { type: ADD_COUNTER, num };
+};
+
+export const reduceCounter = (num) => {
+  return { type: REDUCE_COUNTER, num };
+};
+
+export const updateBanners = (banners) => {
+  return { type: UPDATE_BANNERS, banners };
+};
+
+export const updateRecommends = (recommends) => {
+  return { type: UPDATE_RECOMMENDS, recommends };
+};
+
+export const fetchData = () => {
+  const fetchDataFromRemote = (dispatch, getState) => {
+    axios.get("http://123.207.32.32:8000/home/multidata").then((result) => {
+      const banners = result.data.data.banner.list;
+      const recommends = result.data.data.recommend.list;
+
+      dispatch(updateBanners(banners)); // 在then中派发action
+      dispatch(updateRecommends(recommends));
+    });
+  };
+
+  return fetchDataFromRemote
+};
+
+```
+
+```jsx
+// UI components
+store.dispatch(fetchData())
+```
+
+### 拆分Reducer
+
+如果我们只有一个reducer，那意味着我们要把所有处理逻辑都写进去，如果action类型有成百上千个，那这个reducer函数将变成庞然大物。
+
+在这种时候，我们需要将状态分类，并放到不同的reducer中进行管理，在创建store的时候，我们需要使用 `combineReducers` 将这些reducer合为一个，重构后的目录结构大致如下：
+
+![image-20231220230145172](./React.assets/image-20231220230145172.png)
+
+```js
+// index.js in the red rectangle above
+import { legacy_createStore as createStore, applyMiddleware, combineReducers } from "redux";
+import { thunk } from "redux-thunk";
+import {reducer as counterReducer, addCounter, reduceCounter} from "./counter"
+import {reducer as indexDataReducer, fetchData} from "./index-data"
+
+// combine each reducer
+const combinedReducer = combineReducers({
+  counter: counterReducer,
+  indexData: indexDataReducer
+})
+const store = createStore(combinedReducer, applyMiddleware(thunk));
+
+export { addCounter, reduceCounter, fetchData };
+export default store;
+```
+
+```jsx
+// UI component
+store.getState().indexData.banners() // 现在由于新的state是由多个状态对象聚合而成，因此拿取状态时也需要做调整
+```
+
+## Redux Toolkit (RTK)
+
+自行编写Redux逻辑过于繁琐和麻烦，并且拆分的文件过多。RTK的出现就是为了解决这个问题，它封装了复杂的实现逻辑，并提供了官方推荐的编写Redux的标准方式。
+
+`npm install @reduxjs/toolkit react-redux`
+
+### 主要API
+
+RTK的主要API有以下几个：
+
+- configureStore: 对 createStore 进行了包装，简化了配置选项，提供良好对默认值，它可以自动 combine slice reducers，添加你提供的任何中间件（thunk会默认包含），同时默认启用 Redux DevTools
+- createSlice：创建 slice reducer 的API，slice reducer 可以视作是 reducers 和 action creators 的结合体，这些 slice reducer 会被传入 configureStore 被合并起来
+- createAsyncThunk：一个创建 thunk 类型的 action creator 的函数，在action是异步操作的时候非常有用。它的返回值是一个 Promise，RTK可以根据其状态（Pending｜Fulfilled｜Rejected）来分别进行不同的处理
+
+### 使用实例
+
+在使用RTK后，我们创建store的步骤会变为如下所示：
+
+#### 创建不同的 slice reducer
+
+createSlice 会接收一个对象作为参数，这个对象主要包含以下字段：
+
+- name：redux-devtool里会显示的名字
+- initialState：初始状态
+- reducers：相当于之前的reducer函数，但变成了对象类型，里面的每一个字段都是一个处理action的函数
+- extraReducers: reducers 中没有定义到的 case 最后会走到 extraReducers 中去，但当同名的 action 发生时，reducers拥有更高优先级，extraReducer 主要用来处理包含异步操作的action
+
+createSlice 会返回一个对象，里面包含 reducer 和所有的 action creators，在RTK中，actionCreator会根据reducers里面的函数自动生成，每一个处理action的reducer函数都会有一个同名的actionCreator（如下面的addCounter），这个actionCreator只接收一个参数，当actionCreator被调用后，这个参数最后会被传入到对应的reducer函数中的第二个参数action里面的payload字段当中去
+
+```js
+// counter.js
+import { createSlice } from "@reduxjs/toolkit";
+
+const counterSlice = createSlice({
+  name: "counterSlice",
+  initialState: {
+    counter: 888,
+  },
+  reducers: {
+    addCounter: (state, { payload }) => {
+      return { ...state, counter: state.counter + payload };
+    },
+
+    subCounter: (state, { payload }) => {
+      return { ...state, counter: state.counter - payload };
+    },
+  },
+});
+
+export const counterReducer = counterSlice.reducer // 这个reducer才是store需要的
+export const {addCounter, subCounter} = counterSlice.actions // 每个reducer函数都会自动创建同名的actionCreator
+```
+
+```js
+// recommend.js
+
+import { createSlice, createAsyncThunk, createAction } from "@reduxjs/toolkit";
+import axios from "axios";
+
+// 创建一个 thunkActionCreator, 第一个参数是 actionType，第二个参数是一个函数，其返回值会被传入到reducer函数的action.payload当中
+// 第二个参数里的这个函数还有两个参数，第一个是我们从外部传入的任意参数，第二个则是store
+// 所以我们可以还像自己实现thunk那样，在这个异步函数的then结构当中调用store.dispatch，但是RTK有更加简洁且强大的方式
+export const fetchRecommendDataAction = createAsyncThunk(
+  "fetch/multiData",
+  async (extraInfo, store) => {
+    const result = await axios.get("http://123.207.32.32:8000/home/multidata");
+    return result.data.data;
+  }
+);
+
+const recommendSlice = createSlice({
+  name: "recommend",
+  initialState: {
+    banners: [],
+    recommends: [],
+  },
+  reducers: {
+    updateBanners: (state, { payload }) => {
+      return { ...state, banners: payload };
+    },
+    updateRecommends: (state, { payload }) => {
+      return { ...state, recommends: payload };
+    },
+  },
+  // thunk 相关的reducer函数，需要写在 createSlice的第一个参数的 extraReducers 字段当中
+  // 这里可以为 thunkActionCreator 不同的状态添加不同的回调函数，一般在 fulfilled 状态的回调函数中，我们会去更新状态。
+  extraReducers: (builder) => { 
+    builder
+      .addCase(fetchRecommendDataAction.pending, (state, { payload }) => {
+        console.log("fetchRecommendDataAction Pending...");
+      })
+      .addCase(fetchRecommendDataAction.fulfilled, (state, { payload }) => {
+        return {
+          ...state,
+          banners: payload.banner.list,
+          recommends: payload.recommend.list,
+        };
+      })
+      .addCase(fetchRecommendDataAction.rejected, (state, { payload }) => {
+        console.error("fetchRecommendDataAction Rejected");
+      });
+  },
+});
+
+export const recommendReducer = recommendSlice.reducer;
+export const { updateBanners, updateRecommends } = recommendSlice.actions;
+
+```
+
+#### 根据 slice reducer 创建 store
+
+configureStore 同样接受一个对象，这个对象中最主要的字段就是reducer，这个字段跟combineReducers的参数一样，是一个对象，对象中每一个字段都是一个reducer
+
+```js
+import { configureStore } from "@reduxjs/toolkit";
+import { counterReducer } from "./features/counter";
+import { recommendReducer } from "./features/recommend";
+
+const store = configureStore({
+  reducer: {
+    counter: counterReducer,
+    recommend: recommendReducer
+  }
+})
+
+export default store;
+```
+
+#### 使用 react-redux 连接 store 和 UI
+
+这一部分就和之前一模一样了，通过 react-redux 提供的 provider，把 store 传到 provider 中，从而让被该 provider 下的 UI 组件都能够消费 store 里的状态。
+
+```js
+// \src\index.js
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./apps/rtk/App";
+import store from "./apps/rtk/store";
+import { Provider } from "react-redux";
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(
+  <Provider store={store} >
+    <App />
+  </Provider>
+);
+```
+
+同时我们仍然会使用 connect 来简化代码。
+
+在UI组件当中，我们可以导出 store module 里面我们创建的 actionCreators，然后结合 connect 来像前述章节一样消费state和dispatch。
+
+```js
+import React, { PureComponent } from "react";
+import { connect } from "react-redux";
+import {
+  fetchRecommendDataAction,
+} from "./store/features/recommend";
+
+export class Profile extends PureComponent {
+  componentDidMount() {
+    this.props.fetchRecommendData()
+  }
+
+  render() {
+    const {banners, recommends, counter} = this.props;
+    return (
+      ...
+    );
+  }
+}
+
+const mapStateToProps = (state) => ({
+  counter: state.counter.counter,
+  banners: state.recommend.banners,
+  recommends: state.recommend.recommends,
+});
+
+const mapDispatchToProps = (dispatch) => ({
+  fetchRecommendData: () => dispatch(fetchRecommendDataAction()), // 异步action的派发依然和之前一样，只不过这次的actionCreator是由RTK创建的
+});
+
+export default connect(mapStateToProps, mapDispatchToProps)(Profile);
+
+```
+
 
 
 ## 重渲染 (re-render)
@@ -1527,10 +2424,6 @@ export const foo: React.FC<Props> = ({a, b}) => {
 }
 ```
 
-## React项目中的图片import
-
-`import mealsImage from "../../assets/meals.jpg"`
-
 ## React中的props.children
 
 children就是一个组件下面所包含的子组件
@@ -1575,24 +2468,6 @@ type IProps = {
 }
 ```
 
-## Non-null assertion
-
-当一个变量可能为undefined或者null的时候，在typescript中需要做额外的类型检查才能避免类型报错。
-
-```typescript
-const variableThatMayBeNull = getVar();
-const result = variableThatMayBeNull ? FunctionThatNotLikeNull(variableThatMayBeNull) : null
-```
-
-但是如果你非常确定这个变量绝不可能是null或者undefined的话，你可以在这个变量赋值语句末尾加上感叹号来进行非空断言
-
-```typescript
-const variableThatMayBeNull = getVar()!;
-const result = FunctionThatNotLikeNull(variableThatMayBeNull)
-```
-
-这个感叹号其实和optional标志(?)是相对应的，这个非空断言要谨慎使用，避免发生空值错误
-
 ## Props Drilling VS useContext
 
 useContext的优点很显著，它优化了在state需要传递很多层才能到达目标组件的情况，通过Context Provider包裹一个父组件，该父组件下的所有子孙组件都能够使用context中提供的state。
@@ -1606,93 +2481,6 @@ export const BackDrop: React.FC<IBackDropProps> = ({clickHandler}) => {
 ```
 
 对于上面这个backDrop组件，我们想在点击BackDrop的时候，做一些操作，这个操作可能是关闭当前聚焦的对话框，也有可能是其他操作，对于这种我们想要通过传不同的clickHandler来让其实现不同行为的组件，就需要避免使用useContext。因为一旦使用Context，通过Context传过来的state就定死了，直接将该组件限制到一个具体的行为，降低了它的重用性、
-
-## Typescript: Cannot find namespace
-
-如果一个文件要进行组件渲染（定义函数组件并渲染组件），那么这个文件的后缀名一定要是.tsx
-
-```react
-import React from "react";
-import { IMealItemProps } from "../interfaces/MealsInterfaces";
-import { IChildrenProps } from "../interfaces/UIInterfaces";
-import {CartContext} from "./cart-context";  //如果这个文件的后缀是.ts，那么这个Context可以正常引入，但在下面使用JSX代码的时候，就会报无法找到命名空间的错误
-
-const CartProvider = (props:IChildrenProps) => {
-    const addItemToCartHandler = (item: IMealItemProps) => {}
-    const removeItemFromCartHandler = (id: string) => {}
-    const cartContext = {
-        items: [],
-        totalAmount: 0,
-        addItem: addItemToCartHandler,
-        removeItem: removeItemFromCartHandler
-    }
-    return <CartContext.Provider value={cartContext}>  //Error: Cannot find name space "CartContext"
-        {props.children}
-    </CartContext.Provider>
-}
-```
-
-## 禁止Submit表单时页面的默认重新加载
-
-```react
-<button onclick={
-        (event) => {
-            event.preventDefault(); // 使用这个语句来禁止提交时的页面重加载
-            buttonClickHandler();
-        }
-    }></button>
-```
-
-## 更新状态要避免直接修改老状态
-
-React中在更新状态的时候要避免可变对象(Mutable Object)的产生，在更新状态的时候，不要直接对老的状态对象进行修改，而是应该直接返回一个新对象，然后让新对象成为新的状态对象
-
-```react
-...
-const [itemList, setItemList] = useState([] as IItems[])
-...
-setItemList([...itemList, newItem]) // Correct
-//-----------------
-itemList.push(newItem)
-setItemList(itemList) // 出错，页面并不会重渲染，因为itemList的引用并没有改变
-```
-
-数字、字符串、布尔值这些类型本身就是不可变类型，任何值的改变都会导致重新创建引用，因此可以直接在原对象的值上进行操作
-
-```react
-function App() {
-  const [strList, setStrList] = useState([] as string[])
-  const [testState, setTestState] = useState(0)
-  let handleClick = () => {
-    strList.push("new")
-    setStrList(strList)
-    console.log("strList current:",strList)
-  }
-  const latestStrList = [...strList] // 创建新引用，值会更新
-  return (
-    <div className="App">
-      <h1>StrList:{strList}</h1> //永远不会重渲染，即便它的值已经更新。因为它始终指向同一对象
-      <h1>LatestStrLists:{latestStrList}</h1> //当testState变化的时候才会更新值，因为触发重渲染会执行它的赋值语句，改变它的引用
-      <h1>testState:{testState}</h1> // 会在点击按钮的时候实时更新，因为它的引用一直在变化
-      <button onClick={() => {setTestState(testState + 1)}}>refresh page</button>
-      <button onClick={handleClick} >append</button>
-    </div>
-  );
-}
-```
-
-如果state是非常复杂的nested object，那么要确保被修改到的那些变量所涉及到的每一层都是被copy的，而不是直接mutate老状态，或者只是对顶层浅拷贝后就开始对底层的可变类型属性进行直接修改，这也是一种对老状态的直接mutate，因为底层那些可变类型属性仍然跟老状态中的属性指向同一引用
-
-```typescript
-function updateNestedState(state, action) {
-  // Problem: this only does a shallow copy!
-  let newState = { ...state }
-
-  // ERROR: nestedState作为一个object是可变类型，在上层被浅拷贝后，它仍然指向和老状态的同一引用，所以这里的修改是完全错误的
-  newState.nestedState.nestedField = action.data
-
-  return newState
-```
 
 ## React中提高性能的方法
 
