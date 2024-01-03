@@ -2337,7 +2337,341 @@ export default connect(mapStateToProps, mapDispatchToProps)(Profile);
 
 ```
 
+## 前端路由 (Router)
 
+路由其实就是一个映射表，不同的路由决定不同的资源渲染。
+
+路由最早是由后端进行维护的，因为网页应用开发经历过以下阶段：
+
+1. 后端渲染阶段
+2. 前后端分离阶段
+3. 单页面应用阶段 (SPA)
+
+在后端渲染阶段，服务器会直接生产出渲染好的HTML页面，返回给客户端进行展示，每个页面都有一个独立的URL，服务器会根据这些URL进行正则匹配并交给Controller进行处理，最后由Controller进行各种处理最后生成HTML。
+
+在前后端分离阶段，后端只负责提供API让前端拿数据，前段通过这些数据来渲染页面。
+
+单页面应用最主要的特点就是在前后端分离的基础之上加上了一层前端路由，也就是由前端来维护一套路由规则，不同的URL不会刷新页面，而是渲染不同的代码。
+
+### 前端路由的两种实现模式
+
+前端路由实现URL变化不刷新页面，而是渲染另一套代码，这可以内容映射通过两种方式做到：
+
+1. URL hash
+
+   这种方式是监听URL的变化，通过URL hash 也就是锚点（“#”），改变 window.location 的 href 属性。我们可以直接为 location.hash 赋值来改变 href，页面不会发生刷新。
+
+2. HTML5 的 history
+
+   history有六种模式可以改变URL而不刷新页面：
+
+   - replaceState：替换原理的路径
+   - pushState：使用新的路径
+   - popState：路径的回退
+   - go：向前或向后改变路径
+   - forward：向前改变路径
+   - Back：向后改变路径
+
+### React Router
+
+React 框架有自己的前端路由实现，这个路由在库 `react-router` 当中维护。
+
+但在安装的时候，我们一般选择安装 `react-router-dom` 这个库，因为 `react-router` 会包含一些 react native 的内容，web开发不需要。
+
+#### React Router 基本使用
+
+react-router 为我们提供了一系列的组件，通过这些组件我们可以实现配置路由。
+
+##### BrowserRouter 和 HashRouter
+
+这两个组件用来包裹需要实现路由配置的根组件。
+
+```jsx
+<HashRouter>
+  <App/>
+</HashRouter>
+```
+
+BrwoserRouter使用的是history模式，而HashRouter使用的hash模式。这二者可以通过URL的格式轻易区分出来：
+
+```
+1. hash模式，URL中会存在 # 锚点
+https://example.com/#/home
+
+2. history模式，没有锚点
+https://example.com/home
+```
+
+##### 路由的映射配置
+
+React Router 里面有两种映射配置方式，第一种是通过**组件声明**的方式，第二种是**配置路由对象**的方式。
+
+1. 组件声明
+
+​	React Router 提供了 `Routes` 和 `Route` 两个组件，其中 Route 必须为 Routes 的子组件，在 Route 组件中，我们可以配置具体的路由。
+
+​	Route 组件主要提供两个参数，一个是 `path`，一个是 `element` 。path 属性用于设置匹配路径，而 element 属性则为该路径下需要渲染的组件。
+
+​	如果需要配置二级路由，则直接将 Route 组件作为某个一级路由的子组件，二级路由下的 path 不需要再加斜杠。
+
+​	我们可以在 path 处填入通配符来匹配那些没有被我们明确定义的路径，例子中对于这种情况，我们直接渲染一个404页面。
+
+```jsx
+return(
+  <>
+    <div className='header'>Header</div>
+  	<div className='content'>
+    	<Routes>
+        <Route path="/" element={<Navigate to="/home" />}></Route>
+        <Route path="/home" element={<Home />}>
+        	<Route path="rank" element={<HomeRanking />}></Route>
+        	<Route path="recommend" element={<HomeRecommend />}></Route>
+  			</Route>
+  			<Route path="/about" element={<About />}></Route>
+  			<Route path="*" element={<NotFound />}></Route>
+			</Routes>
+  	</div>
+		<div className='footer'>Footer</div>
+  </>
+```
+
+2. 配置路由对象
+
+​	我们可以通过配置一个对象，然后把这个对象传到 React Router 提供的一个hook `useRoutes` 当中，来实现同样的路由配置。
+
+```jsx
+// app-routes.js
+// ...
+const routes = [
+  {
+    path: "/",
+    element: <Navigate to="/home" />,
+  },
+  {
+    path: "/home",
+    element: <Home />,
+    children: [
+      {
+        path: "rank",
+        element: <HomeRanking />,
+      },
+      {
+        path: "recommend",
+        element: <HomeRecommend />,
+      },
+    ],
+  },
+  {
+    path: "/about",
+    element: <About />,
+  },
+  {
+    path: "*",
+    element: <NotFound />,
+  },
+];
+
+export default routes
+```
+
+```jsx
+// App.jsx
+// ...
+import routes from "app-routes"
+
+// ...
+	return(
+  	<>
+    	<div className='header'>Header</div>
+    	<div className='content'> {useRoutes(routes)} </div>
+    	<div className='footer'>Footer</div>
+    </>
+  )
+// ...
+```
+
+##### 路由的跳转
+
+1. Link 组件
+
+   Link 组件是由 React Router 提供的一种组件，它最后会被渲染成一个 a 标签。该组件主要需要传入一个 `to` 参数，这个参数就是我们配置的路由路径。
+
+   ```jsx
+   <Link to="/home" className="navlink">
+   ```
+
+   该方式的缺点在于，这个组件只能被渲染成一个 a 标签，在样式上的扩展性很差。
+
+2. Navigate 组件
+
+   该组件同样是由 React Router 提供的，这个组件同样需要传入一个 `to` 属性，对应我们配置的路由路径。这个组件不会渲染任何实质的UI，反之，当这个组件被渲染时，它会直接跳转到对应的路由，渲染对应路由下的组件。
+
+   ```jsx
+   <Route path="/" element={<Navigate to="/home" />}></Route> {/* 让默认路由直接跳转到 home */}
+   ```
+
+3. useNavigate hook
+
+   这个hook也由 React Router 提供，它会直接返回一个 navigate 方法，往这个方法中传入路由即可实现跳转。
+
+   ```jsx
+   function User(props) {
+     const navigate = useNavigate();
+     
+     return (
+     	<>
+       	<button onClick={() => navigate('/user/profile')}>Profile</button>
+       	<button onClick={() => navigate('/user/friends')}>Friends</button>
+       	<Outlet/>
+       </>
+     )
+   }
+   ```
+
+##### 路由嵌套中的占位组件
+
+当我们使用路由嵌套的时候，二级路由的组件会作为一级路由组件的子组件渲染，这需要我们在一级路由组件当中提前为二级路由组件预留一个占位组件，这个组件就是 `<Outlet/>` 
+
+```jsx
+// App.jsx
+// ...
+<Routes>
+  {/* ... */}
+	<Route path='/user' element={<User/>}></Route>
+  	<Route path='profile' element={<Profile/>}></Route>
+  	<Route path='friends' element={<Friends/>}></Route>
+</Routes>
+```
+
+```jsx
+// User.jsx
+function User(props) {
+  const navigate = useNavigate();
+  
+  return (
+  	<>
+    	<button onClick={() => navigate('/user/profile')}>Profile</button>
+    	<button onClick={() => navigate('/user/friends')}>Friends</button>
+    	<Outlet/> // 二级路由占位组件, Profile 和 Friends 组件会被渲染在这里
+    </>
+  )
+}
+```
+
+![image-20240103222328356](./React.assets/image-20240103222328356.png)
+
+##### 路由跳转时的参数传递
+
+在 React Router 当中，路由跳转时传递参数有两种方式：动态路由和QSP
+
+1. 动态路由
+
+   ```jsx
+   // App.jsx
+   // ...
+   <Routes>
+   	<Route path='/user/:id' element={<User/>}></Route> {/* 使用动态路由的时候，需要这样定义路径，id就是需要传递的参数 */}
+   </Routes>
+   ```
+
+   ```jsx
+   // User.jsx
+   export function User(props) {
+     const routerParams = useParams() // 拿动态路由的时候需要用到这个 hook
+     return <h2>Rendering User {routerParams.id}</h2> // 取出动态路由中的参数
+   }
+   ```
+
+   ```jsx
+   // UserCard.jsx
+   export function UserCard(props) {
+     // ...
+     const navigate = useNavigate()
+     return (
+     	<div onClick={() => navigate('/user/123')}> {/* 传递参数 */}
+       	{/*...*/}
+       </div>
+     )
+   }
+   ```
+
+2. QSP
+
+   ```jsx
+   // App.jsx
+   // ...
+   <Routes>
+   	<Route path='/user' element={<User/>}></Route>
+   </Routes>
+   ```
+
+   ```jsx
+   // UserCard.jsx
+   export function UserCard(props) {
+     const navigate = useNavigate()
+     return (
+       <button onClick={() => navigate(`/user?name=${this.props.name}&age=${this.props.age}`)}> Go to User </button>
+     )
+   }
+   ```
+
+   ```jsx
+   // User.jsx
+   export function User(props) {
+     
+     // const location = useLocation(); location可以拿到路由中的QSP，但是需要我们额外进行解析
+     // console.log(location);
+     /**
+      * {
+       "pathname": "/user",
+       "search": "?name=lhy&age=26",
+       "hash": "",
+       "state": null,
+       "key": "default"
+       }
+      */
+   
+     const [params, setParams] = useSearchParams() // 该hook可以直接帮我们完成解析，注意这个params不是一个简单的JS对象，直接打印不会有任何输出
+     return <div>User-{params.get('name')}-{params.get('age')}</div>;
+     
+     // 如果我们需要把params里面的内容取出来，作为一个简单的JS对象传给子组件，我们不用一个一个字段遍历再通过get去拿对应的字段值
+     // const paramObj = Object.fromEntries(params))
+     // console.log(paramObj) --> {name: 'lhy', age: '26'}
+   }
+   ```
+
+### 懒加载
+
+懒加载的主要作用是实现分包。
+
+如果我们不用懒加载，那我们所有的代码都会被打包到一个文件里面，并在运行时直接加载。
+
+![image-20240103225044374](./React.assets/image-20240103225044374.png)
+
+如果我们将路由中的部分组件进行懒加载，那这些组件对应的代码会被分别打包到不同的文件中，在项目第一次运行的时候，这些懒加载的代码并不会被加载，而是在这些代码第一次需要被用到的时候，浏览器才会去下载对应的js文件来加载该代码和组件。
+
+![image-20240103225321949](./React.assets/image-20240103225321949.png)
+
+#### 实现懒加载
+
+```jsx
+const User = React.lazy(() => import("./User"))
+const Friend = React.lazy(() => import("./Friend"))
+```
+
+#### Suspense
+
+如果我们不做任何额外操作，那第一次渲染到上面的 User 组件时，页面会直接变白挂掉。这是因为资源还没有下载好，User组件渲染失败就会直接报错。
+
+所以，在使用懒加载的时候，我们需要在根组件外面套一个 `<Suspense/>` 组件，这个组件可以传入一个 `fallback` 参数，这个参数接收一个组件。当页面对应的资源还没加载好的时候，会挂起目标组件，转而渲染 fallback 组件，当资源下载好之后，再渲染目标组件
+
+```jsx
+<Suspense fallback={<Loading/>}>
+	<HashRouter>
+  	<App/>
+  </HashRouter>
+</Suspense>
+```
 
 ## 重渲染 (re-render)
 
