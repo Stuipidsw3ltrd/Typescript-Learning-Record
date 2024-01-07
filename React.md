@@ -2673,6 +2673,574 @@ const Friend = React.lazy(() => import("./Friend"))
 </Suspense>
 ```
 
+## Hooks
+
+**为什么需要 Hooks ？**
+
+在 Hooks 出现之前，函数式组件是不能管理自己的状态的，这就导致了类组件对于函数式组件有绝对的优势：
+
+1. 类组件可以定义自己的state，从而管理自己组件内的状态
+2. 类组件有自己的生命周期，可以在生命周期回调函数中完成各种操作
+3. 类组件可以在状态改变的时候，仅仅重新执行render函数以及 componentDidUpdate 函数中的内容，而函数式组件在重新渲染的时候，整个函数都会被重新执行，似乎没有什么地方能够让代码只被执行一次。
+
+但类组件同样存在一些缺点：
+
+1. 代码臃肿，复杂的类组件通常难以阅读和理解。
+2. 复杂的类组件难以重构拆分，强行拆分反而会造成过度设计，增加代码复杂度
+3. 类组件中的this指向时常会成为一个陷阱
+4. 组件之间共享状态非常复杂，使得代码编写和设计上变得困难。比如说我们通过 Provider 和 Consumer 来共享状态，多个不同的 Provider 必然会造成类组件中 Consumer 的多层嵌套
+
+Hooks 的出现，不仅能够弥补之前函数式组件做不到而类组件能够做到的事情，它更是直接消灭了类组件的很多缺点。Hooks 能够让我们在函数式组件中拥有状态管理、仿生命周期管理的同时，还让函数式组件具备了编写简单、结构轻量化、复用性强等一系列特点。
+
+### useEffect()
+
+当某些依赖发生改变，需要执行相应的操作（通常是副作用，比如网络请求、数据获取或者状态变化等等）时，就需要使用到useEffect
+
+```react
+useEffect(callback, dependency)
+```
+
+其中callback是回调函数。dependency是一个依赖数组，一旦这个数组中的元素发生改变，那么就将触发第一个参数callback回调函数。
+
+dependency可以有多种写法，每种都会造成不一样的效果：
+
+1. 直接不写或者写undefined，那么只要当前组件重渲染，就会触发callback
+2. 填一个空数组 `[]` ，那么只有组件首次渲染的时候，会触发callback
+3. 填入一个非空数组 `[a,b,c]` ，那么当依赖数组里面的a、b或者c发生变化的时候，就会触发callback
+
+useEffect还可以在callback当中写一个return语句，这个语句就是useEffect的清洁工，它会在每次组件被销毁的时候执行。所谓组件被销毁，就是重渲染的时候，会销毁旧组件，创建新组件，这个时候，如果组件内还有一些计时器或者订阅之类的会持续浪费内存的操作，那么就可以在return语句中统一销毁掉。
+
+> **每次重新渲染，都会导致原组件（包含子组件）的销毁，以及新组件（包含子组件）的诞生**。
+>
+> **结论**：
+>
+> 1、首次渲染，并不会执行useEffect中的 return
+>
+> 2、变量修改后，导致的重新render，会先执行 useEffect 中的 return，再执行useEffect内除了return部分代码。
+>
+> 3、return 内的回调，可以用来清理遗留垃圾，比如订阅或计时器 ID 等占用资源的东西。
+
+```react
+  useEffect(() => {
+    if (cartCtx.items.length === 0){
+      return
+    }
+    setBtnIsHighlighted(true)
+    const timer = setTimeout(() => {
+      setBtnIsHighlighted(false)
+    }, 300)
+
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [cartCtx.items])
+```
+
+在需要的时候，一个组件可以同时存在多个 useEffect，实现逻辑分离，让代码结构更清晰。
+
+### useContext()
+
+参考链接：
+
+[Hook API 索引 – useContext (reactjs.org)](https://zh-hans.reactjs.org/docs/hooks-reference.html#usecontext)
+
+useContext可以给特定组件树下的所有组件都提供一个全局的上下文，这些组件可以用到这些上下文包含的那些属性
+
+使用useContext：
+
+1. 用createContext创建一个context
+
+   ```react
+   import React from 'react'
+   import { ICartContext, ICartItem } from '../interfaces/CartInterfaces'
+   
+   export const CartContext = React.createContext({
+       items: [],
+       totalPrice: 0,
+       addItem: (item: ICartItem) => {},
+       removeItem: (id: string) => {}
+   } as ICartContext) // 这里需要提供一个初始值
+   ```
+
+2. 用ContextProvider包裹要接收上下文的组件
+
+   ```react
+   import { CartContext } from "./cart-context"; // 先把创建的context引入过来
+   // 通常可以把创建context和context provider的逻辑分开，因为在provider当中，我们需要定义一些逻辑和方法来对context当中的value进行修改，比如说下面的addItem和removeItem函数就是用来对context当中的items和totalPrice进行更新的
+   ...
+     const cartContext: ICartContext = {
+       items: state.items,
+       totalPrice: state.totalPrice,
+       addItem: addItemToCartHandler,
+       removeItem: removeItemFromCartHandler,
+     };
+     return (
+       // 用CartContext包裹组件，那么被包裹的组件及其下属的组件树，都可以使用这个Context Provider提供的value
+       <CartContext.Provider value={cartContext}> 
+         {props.children}
+       </CartContext.Provider>
+     );
+    };
+   ```
+
+3. 在被包裹的子组件中使用context中的属性
+
+   ```react
+   import { CartContext } from '../../store/cart-context'
+   
+   export default function HeaderCartButton(props:IHeaderButtonProps) {
+     const cartCtx = useContext(CartContext);
+     const numberOfCartItems = cartCtx.items.reduce((curNumber, item: ICartItem) => {return curNumber + item.amount}, 0)
+     return (
+       <button className={classes.button} onClick={props.showCartHandler}>
+           <span className={classes.icon}>
+               <CartIcon></CartIcon>
+           </span>
+           <span>Your Cart</span>
+           <span className={classes.badge}>{numberOfCartItems}</span>
+       </button>
+     )
+   }
+   ```
+
+### useReducer()
+
+参考链接：
+
+[Immutable Update Patterns | Redux](https://redux.js.org/usage/structuring-reducers/immutable-update-patterns#updating-nested-objects)
+
+---
+
+当一个组件中需要管理较多的state，或者说state的逻辑比较复杂的时候，可以使用useReducer来让state的更新逻辑更加清晰。
+
+但需要注意，useReducer只是useState的一种替代方案，在组件状态过多的时候进行统一管理。它并不能替代Redux，因为它只是一个hook，其管理的状态只局限于某个组件的作用域，而Redux是全局的状态管理。
+
+使用useReducer：
+
+1. 定义初始状态和reducer函数
+
+   初始状态就是要管理的状态的初始值，通常在使用useReducer的时候，我们会把原本需要使用useState分开定义的state合并到一个object当中
+
+   reducer函数是一个管理状态更新逻辑的函数，它接受两个参数：prevState和action，前者是上一个时间步（当前还没更新）的状态，后者包含要采取的状态更新操作和状态更新所用到的数据
+
+   reducer函数返回更新后的状态：
+
+   ```typescript
+   type IState = {
+       ... // your state
+   }
+       
+   type IAction = {
+       type: string,
+       payload?: {item: IItem} // payload就是更新状态时所需要用到的数据，类型接口需要自己决定，是否为optional也可以自己决定
+   }
+   
+   const reducerFunction = (prevState: IState, action: IAction) => {
+       switch(action.type){
+           case "AddItem":
+               updatedItems = [...prevState.items, action.payload!.item] //这里请参看参考链接里关于如何在reducer函数中更新状态的说明
+               return {...prevState, items: updatedItems}
+           case "RemoveItem":
+               ......
+           default:
+               return prevState
+       }
+   }
+   ```
+
+2. 使用useReducer钩子
+
+   ```typescript
+   const [state, dispatch] = useReducer(reducerFunction, initState);
+   // state 就是现在的最新状态
+   // dispatch 就是调用 reducerFuntion 的函数，其接口定义： const dispatch: (value: IAction) => void
+   // 所以我们要使用dispatch，就需要往里面传一个IAction对象，也就是我们在上一个代码块中定义的那个，来决定状态更新的操作和数据
+   const addItemOperation = (item: IItem) => {
+       dispatch({type: "AddItem", payload: {item: item}})
+   }
+   // 这个时候，我们就能够调用 addItemOperation 来更新状态当中的items了
+   ```
+
+### useRef()
+
+参考链接：
+
+[你不知道的 useRef - 知乎 (zhihu.com)](https://zhuanlan.zhihu.com/p/105276393)
+
+---
+
+在React中，当组件被重渲染时，组件内的所有变量和方法都会被重新赋值和分配引用，如果当我们想在组件的整个生命周期保持组件内一个值或者方法的引用保持不变，不随重渲染而被重新赋值和引用，那么就需要使用useRef。
+
+useRef 的常用场景是下面两种：
+
+1. 引入DOM元素（也可以是一个类组件）
+2. 保存一个数据，这个对象在组件整个生命周期中保持不变
+
+useRef的作用是保持对某一个值的引用. 同样，当你想对原生的DOM中某一个元素进行直接引用，那么也可以使用useRef。
+
+useRef所保持的元素或者值,在组件的整个生命周期内都返回同一个引用（一个可变的Ref对象）。
+
+useRef的使用方法：
+
+首先使用useRef来初始化一个ref，然后可以通过调用ref中的current来获取这个ref中最新的值，在整个组件的生命周期中，这个ref始终都是同一对象。
+
+```jsx
+import React, { useState, useRef } from "react";
+
+let obj = null;
+export default function App() {
+  const [count, setCount] = useState(0);
+  const objRef = useRef({});
+  console.log(objRef === obj); // 除了第一次渲染为false外，后续每次重渲染都会打印true，证明useRef始终返回同一对象。
+  obj = objRef;
+
+  const clickHandler = () => {
+    setCount(count + 1);
+  };
+  return <button onClick={clickHandler}>+1</button>;
+}
+
+```
+
+
+
+```react
+import React, { useRef } from "react";
+
+export const TestComponent: React.FC<IProps> = (props) => {
+    const ref = useRef(0)
+    console.log(ref.current) // 这个current根据我们的定义是一个数字。它可以容纳任何类型
+    ...
+}
+```
+
+如果想把ref传递给其他组件，可以使用React.forwardRef来包裹该组件，然后被包裹的这个组件就可以在props旁边再加一个ref属性，被传递ref的这个组件就可以直接使用这个ref了
+
+useRef 可以用来直接获取原生DOM节点的引用
+
+```tsx
+import React, { useRef, useState } from "react";
+
+export const TestComponent: React.FC<IProps> = (props) => {
+    const ref = useRef<HTMLInputElement>(); // 这个ref现在就被定义成了一个HTMLInputElement对象
+    const [isShow, setIsShow] = useState(false)
+    return (
+    	<TestInput ref={ref}></TestInput>
+        <button onclick={()=>setIsShow(!isShow)}>toggle show input value</button>
+        {isShow && `Input Value:${ref.current.value}`} //现在这个ref所指向的对象已经是下面代码块中的那个input节点了，因此可以用ref.current.value来实时获取它的值
+    )
+}
+```
+
+```react
+export const TestInput = React.forwardRef((props, ref) => {
+    return (
+        <input ref={ref}></input>
+    )
+})
+```
+
+由于ref是一个始终指向同一引用的可变对象，**因此修改ref.current并不会导致页面的重渲染**
+
+### useMemo()
+
+useMemo是一个提高组件性能的钩子，它能够减少组件内开销很大的计算被不必要运行的次数。
+
+同时，如果我们要给子组件传递相同内容的对象时，我们也可以使用 useMemo 来避免对象被反复创建。
+
+```typescript
+useMemo(fn: () => {}, dependency: any[])
+// fn为要执行的代码块，在组件首次渲染的时候它会被执行，此后如果dependency中的变量不发生变化，fn不会被重新执行，而是返回之前缓存的结果
+// denpendency 是一个数组，可以存放任何对象，一旦里面的内容发生变化，fn就会被重新执行并返回新结果
+```
+
+```typescript
+const result = useMemo(() => {
+	let addResult = 0;
+	for (let i = state; i < 10000000000; i++){
+		addResult += i
+	}
+	return addResult;
+}, [state])
+```
+
+### useCallback()
+
+参考链接：
+
+[React useCallback Hook (w3schools.com)](https://www.w3schools.com/react/react_usecallback.asp)
+
+useCallback跟useMemo类似，只不过它会返回一个记忆化(memoized)函数，如果依赖数组中的对象或者变量保持不变，则这个函数的引用也不会改变。
+
+在通常情况下，如果我们在函数式组件中定义一个函数，如下所示，如果我们点击这个button，组件会重渲染，那么每一次重渲染都会让这个函数被重新定义一次，导致函数的引用发生改变。
+
+```typescript
+import React, { useState } from "react";
+
+export default function App() {
+  const [count, setCount] = useState(0);
+
+  function increment() {
+    setCount(count + 1)
+  }
+  return (
+    <div>
+      <div>Count: {count}</div>
+      <button onClick={increment}>+1</button>
+    </div>
+  );
+}
+
+```
+
+在使用 useCallback 包裹函数之后，在每一次组件重渲染的时候，**该函数依然会被重新定义一次**，但是，如果依赖数组中的值不发生变化，useCallback 不会被重新执行，这个新创建的函数不会被返回出来，因此我们得到的依然是老函数的引用，这就是函数的记忆化。
+
+useCallback 接收两个参数，第一个参数就是目标函数，第二个参数就是依赖数组，只有依赖数组中的变量发生了变化才会导致函数被重新定义。
+
+使用 useCallback 的时候，需要注意**闭包陷阱**，如果我们需要使用这个函数去更新状态，这个状态必须要写在依赖数组里面，可以参见下面例子中的注释。
+
+```jsx
+import React, { useCallback, useState } from "react";
+
+export default function App() {
+  const [count, setCount] = useState(0);
+
+  // const increment = useCallback(() => {
+  //   setCount(count + 1);
+  // }, []);
+  
+  // 注意，这里的依赖数组中，如果不填入state，则会落入闭包陷阱。
+  // 因为我们useCallback中的函数是定义在函数组件中的一个闭包函数
+  // 它在创建的时候，会捕获当前的count值。如果我们不把count state加入到
+  // useCallback的依赖数组里，那么这个函数将会永远是我们第一次创建的函数
+  // 其捕获到的count值为0。所以，我们会发现，无论我们怎么点这个button，count的值
+  // 始终都会为1.
+
+  const increment = useCallback(() => {
+    setCount(count + 1);
+  }, [count]);
+
+  return (
+    <div>
+      <div>Count: {count}</div>
+      <button onClick={increment}>+1</button>
+    </div>
+  );
+}
+
+```
+
+看起来，useCallback 既不能减少函数被重新定义的次数，其引用也会随着state变化而变化，那它到底优化了什么？
+
+答案是，它能确保一个组件只有在props变化的时候，才执行重渲染，而不会因为函数的重新创建而重渲染。因此，useCallback 经常与 React.memo连用。
+
+```jsx
+// ComponentContainer.jsx
+import React, { memo, useCallback, useState } from "react";
+import ComponentRenderer from "./ComponentRenderer";
+
+const ComponentContainer = memo(() => {
+  const [todos, setTodos] = useState([]);
+  const [count, setCount] = useState(0)
+
+  // 如果这里我们不使用useCallback, 那么，如果我们点击了 Count + 1 这个按钮，
+  // Container 会被重渲染，那么 updateTodos 这个函数的引用会发生改变，
+  // 而这个函数又会被作为props传到 ComponentRenderer 组件当中，引发该组件的重渲染
+  // 这个重渲染是完全不必要的，因为 ComponentRenderer 的 props 实质上没有发生任何变化
+  const updateTodos = useCallback(
+    (newTodo) => {
+      console.log(`adding a new todo: ${newTodo}`);
+      setTodos([...todos, newTodo]);
+    },
+    [todos]
+  );
+
+  return (
+    <>
+    <button onClick={() => setCount(count + 1)}>Count +1</button>
+    <ComponentRenderer
+      todos={todos}
+      updateTodos={updateTodos}
+    ></ComponentRenderer>
+    </>
+  );
+});
+
+export default ComponentContainer;
+
+```
+
+```jsx
+// ComponentRenderer.jsx
+import React, { memo } from 'react'
+
+const ComponentRenderer = memo((props) => {
+  const {todos, updateTodos} = props
+  return (
+    <>
+      <div>{todos}</div>
+      <button onClick={() => updateTodos("new todo")}>add a new todo</button>
+    </>
+  )
+})
+
+export default ComponentRenderer
+```
+
+在React当中，每当组件被重渲染，组件中的函数都会被重新赋值和分配引用，因此新函数的引用跟被销毁组件中的函数根本不指向同一内存地址，两个对象只要引用不一样，那么默认情况下React会直接判定二者不是同一对象，从而导致React.memo判定达不到程序员想要的效果。
+
+这时候需要把要传给子组件的函数用useCallback所包裹起来，这时候如果依赖不变，那么这个函数将始终指向同一引用，这时候被React.memo包裹的子组件就能够接收到相同的函数对象了。
+
+### useImperativeHandle
+
+当我们使用 useRef 将一个 ref 从父组件传递到子组件，并最终将其绑定给子组件的一个DOM元素时，父组件可以直接对这个DOM元素进行操作。
+
+很多时候，我们并不期望父组件能够对某个子组件的DOM元素进行任意的操作，我们只希望暴露给父组件一部分可以操作该DOM元素的API，这个时候，我们可以使用 useImperativeHandle。
+
+useImperativeHandle 接收两个参数，第一个参数是一个 ref，第二个参数是一个回调函数，这个函数会返回一个对象。该hook会把这个函数返回的对象，绑定到传入的ref.current上面。参见下面的例子
+
+```jsx
+import React, { forwardRef, memo, useImperativeHandle, useRef } from "react";
+
+const App = memo(() => {
+  const sonRef = useRef();
+
+  const handleDom = () => {
+    sonRef.current.printLog();
+    sonRef.current.setFocus();
+    sonRef.current.setValue("hahaha");
+  };
+
+  return (
+    <>
+      <Son ref={sonRef}></Son>
+      <button onClick={handleDom}>Handle DOM</button>
+    </>
+  );
+});
+
+const Son = forwardRef((props, ref) => {
+  const inputRef = useRef();
+
+  // 父组件传进来的ref.current，跟 useImperativeHandle 的第二个参数返回的对象进行了绑定
+  // 也就是说我们可以通过 ref.current.printLog() 这样来调用该对象中的函数
+  // 可以看到这里我们在子组件中定义了一个ref传递给input，然后在 useImperativeHandle 里暴露的API里调用这个 ref
+  // 这样就实现了父组件对 input DOM 的间接调用，父组件不再能够直接访问到 input DOM，而是只能使用子组件暴露给它的 API
+  useImperativeHandle(ref, () => ({
+    printLog: () => {
+      console.log("printing Son component DOM log");
+    },
+    setFocus: () => {
+      inputRef.current.focus();
+    },
+    setValue: (val) => {
+      inputRef.current.value = val;
+    },
+  }));
+
+  return <input ref={inputRef}></input>;
+});
+
+export default App;
+
+```
+
+### useLayoutEffect
+
+useLayoutEffect 和 useEffect 非常相似，它们的区别在于执行回调函数的时机：
+
+- useEffect 中的回调会在 DOM 更新之后执行，它不会阻塞 DOM 的更新
+- useLayoutEffect 中的回调会在 DOM 更新之前执行，它会阻塞 DOM 的更新
+
+<img src="./React.assets/image-20240107191859454.png" alt="image-20240107191859454" style="zoom:80%;" />
+
+```jsx
+import React, { memo, useEffect, useLayoutEffect } from 'react'
+
+const App = memo(() => {
+
+  useEffect(() => {
+    console.log('useEffect')
+  })
+
+  useLayoutEffect(() => {
+    console.log('useLayoutEffect')
+  })
+
+  console.log('render')
+  return (
+    <div>App</div>
+  )
+})
+
+export default App
+
+// 打印顺序：
+// render
+// useLayoutEffect
+// useEffect
+```
+
+useLayoutEffect 相比于 useEffect 的显著作用就在于，它可以在数据真正被渲染出来之前，再做一些操作。比如说下面的简单例子中，我想渲染一个随机数字，但这个数字不能是0，如果发现它在变化的过程中变成0了，我会选择把它改为一个非0的随机数进行渲染。
+
+```jsx
+import React, { memo, useEffect, useLayoutEffect, useState } from 'react'
+
+const App = memo(() => {
+
+  const [count, setCount] = useState(1)
+
+  // 在这个场景中，是不能使用useEffect的，因为它会在数据实际渲染出来之后再执行
+  // 使用 useEffect 的话，0依然会显示在屏幕上，只不过会一闪而过
+  // useEffect(() => {
+  //   if(count === 0) {
+  //     setCount(Math.random() * 100)
+  //   }
+  // });
+
+  useLayoutEffect(() => {
+    if(count === 0) {
+      setCount(Math.random() * 100)
+    }
+  })
+
+  return (
+    <>
+    <div>Count: {count}</div>
+    <button onClick={() => setCount(0)}>set as 0</button>
+    </>
+  )
+})
+
+export default App
+```
+
+官方建议尽量少地使用 useLayoutEffect，而多使用 useEffect。因为它会阻塞 DOM 的更新。
+
+### Custom Hooks
+
+自定义Hook的最终目的：共享相同的代码逻辑，减少代码冗余。所以自定义hook的实质其实就是把一段函数逻辑抽出去。
+
+自定义Hook就是一个函数，函数名以use开头，用use开头能让React将这个函数识别为一个hook，从而让其遵循[Hook规则](https://zh-hans.reactjs.org/docs/hooks-rules.html)
+
+程序员可以自行定义Custom Hook函数的参数和返回值
+
+```react
+export function useBeer(beerType: string) {
+    {data, loading, error} = useQuery(BEER_QUERY[beerType])
+    [price, setPrice] = useState(0)
+    if (data){
+        setPrice(data.beerInfo.price)
+    }
+    const setCrazySalePrice = (factor:number, bias:number) => {
+        this.setPrice(price * factor + bias)
+    }
+    return [price, setCrazySalePrice, loading]
+}
+```
+
+这个自定义Hook接收一个啤酒类别的参数，然后获取啤酒的实时价格，然后返回啤酒的价格state以及一个可以改变价格的函数和loading状态
+
 ## 重渲染 (re-render)
 
 重渲染前提：
@@ -2849,298 +3417,4 @@ function CompareFunction(prevProps: IMockProps, currentProps: IMockProps){
 ### useCallback Hook
 
 详见[useCallback()](###useCallback())
-
-## Hooks
-
-### useEffect()
-
-当某些依赖发生改变，需要执行相应的操作（通常是副作用，比如网络请求、数据获取或者状态变化等等）时，就需要使用到useEffect
-
-```react
-useEffect(callback, dependency)
-```
-
-其中callback是回调函数。dependency是一个依赖数组，一旦这个数组中的元素发生改变，那么就将触发第一个参数callback回调函数。
-
-dependency可以有多种写法，每种都会造成不一样的效果：
-
-1. 直接不写或者写undefined，那么只要当前组件重渲染，就会触发callback
-2. 填一个空数组 `[]` ，那么只有组件首次渲染的时候，会触发callback
-3. 填入一个非空数组 `[a,b,c]` ，那么当依赖数组里面的a、b或者c发生变化的时候，就会触发callback
-
-useEffect还可以在callback当中写一个return语句，这个语句就是useEffect的清洁工，它会在每次组件被销毁的时候执行。所谓组件被销毁，就是重渲染的时候，会销毁旧组件，创建新组件，这个时候，如果组件内还有一些计时器或者订阅之类的会持续浪费内存的操作，那么就可以在return语句中统一销毁掉。
-
-> **每次重新渲染，都会导致原组件（包含子组件）的销毁，以及新组件（包含子组件）的诞生**。
->
-> **结论**：
->
-> 1、首次渲染，并不会执行useEffect中的 return
->
-> 2、变量修改后，导致的重新render，会先执行 useEffect 中的 return，再执行useEffect内除了return部分代码。
->
-> 3、return 内的回调，可以用来清理遗留垃圾，比如订阅或计时器 ID 等占用资源的东西。
-
-```react
-  useEffect(() => {
-    if (cartCtx.items.length === 0){
-      return
-    }
-    setBtnIsHighlighted(true)
-    const timer = setTimeout(() => {
-      setBtnIsHighlighted(false)
-    }, 300)
-
-    return () => {
-      clearTimeout(timer)
-    }
-  }, [cartCtx.items])
-```
-
-
-
-### useContext()
-
-参考链接：
-
-[Hook API 索引 – useContext (reactjs.org)](https://zh-hans.reactjs.org/docs/hooks-reference.html#usecontext)
-
-useContext可以给特定组件树下的所有组件都提供一个全局的上下文，这些组件可以用到这些上下文包含的那些属性
-
-使用useContext：
-
-1. 用createContext创建一个context
-
-   ```react
-   import React from 'react'
-   import { ICartContext, ICartItem } from '../interfaces/CartInterfaces'
-   
-   export const CartContext = React.createContext({
-       items: [],
-       totalPrice: 0,
-       addItem: (item: ICartItem) => {},
-       removeItem: (id: string) => {}
-   } as ICartContext) // 这里需要提供一个初始值
-   ```
-
-2. 用ContextProvider包裹要接收上下文的组件
-
-   ```react
-   import { CartContext } from "./cart-context"; // 先把创建的context引入过来
-   // 通常可以把创建context和context provider的逻辑分开，因为在provider当中，我们需要定义一些逻辑和方法来对context当中的value进行修改，比如说下面的addItem和removeItem函数就是用来对context当中的items和totalPrice进行更新的
-   ...
-     const cartContext: ICartContext = {
-       items: state.items,
-       totalPrice: state.totalPrice,
-       addItem: addItemToCartHandler,
-       removeItem: removeItemFromCartHandler,
-     };
-     return (
-       // 用CartContext包裹组件，那么被包裹的组件及其下属的组件树，都可以使用这个Context Provider提供的value
-       <CartContext.Provider value={cartContext}> 
-         {props.children}
-       </CartContext.Provider>
-     );
-    };
-   ```
-
-3. 在被包裹的子组件中使用context中的属性
-
-   ```react
-   import { CartContext } from '../../store/cart-context'
-   
-   export default function HeaderCartButton(props:IHeaderButtonProps) {
-     const cartCtx = useContext(CartContext);
-     const numberOfCartItems = cartCtx.items.reduce((curNumber, item: ICartItem) => {return curNumber + item.amount}, 0)
-     return (
-       <button className={classes.button} onClick={props.showCartHandler}>
-           <span className={classes.icon}>
-               <CartIcon></CartIcon>
-           </span>
-           <span>Your Cart</span>
-           <span className={classes.badge}>{numberOfCartItems}</span>
-       </button>
-     )
-   }
-   ```
-
-### useReducer()
-
-参考链接：
-
-[Immutable Update Patterns | Redux](https://redux.js.org/usage/structuring-reducers/immutable-update-patterns#updating-nested-objects)
-
----
-
-当一个组件中需要管理较多的state，或者说state的逻辑比较复杂的时候，可以使用useReducer来让state的更新逻辑更加清晰
-
-使用useReducer：
-
-1. 定义初始状态和reducer函数
-
-   初始状态就是要管理的状态的初始值，通常在使用useReducer的时候，我们会把原本需要使用useState分开定义的state合并到一个object当中
-
-   reducer函数是一个管理状态更新逻辑的函数，它接受两个参数：prevState和action，前者是上一个时间步（当前还没更新）的状态，后者包含要采取的状态更新操作和状态更新所用到的数据
-
-   reducer函数返回更新后的状态：
-
-   ```typescript
-   type IState = {
-       ... // your state
-   }
-       
-   type IAction = {
-       type: string,
-       payload?: {item: IItem} // payload就是更新状态时所需要用到的数据，类型接口需要自己决定，是否为optional也可以自己决定
-   }
-   
-   const reducerFunction = (prevState: IState, action: IAction) => {
-       switch(action.type){
-           case "AddItem":
-               updatedItems = [...prevState.items, action.payload!.item] //这里请参看参考链接里关于如何在reducer函数中更新状态的说明
-               return {...prevState, items: updatedItems}
-           case "RemoveItem":
-               ......
-           default:
-               return prevState
-       }
-   }
-   ```
-
-2. 使用useReducer钩子
-
-   ```typescript
-   const [state, dispatch] = useReducer(reducerFunction, initState);
-   // state 就是现在的最新状态
-   // dispatch 就是调用 reducerFuntion 的函数，其接口定义： const dispatch: (value: IAction) => void
-   // 所以我们要使用dispatch，就需要往里面传一个IAction对象，也就是我们在上一个代码块中定义的那个，来决定状态更新的操作和数据
-   const addItemOperation = (item: IItem) => {
-       dispatch({type: "AddItem", payload: {item: item}})
-   }
-   // 这个时候，我们就能够调用 addItemOperation 来更新状态当中的items了
-   ```
-
-### useRef()
-
-参考链接：
-
-[你不知道的 useRef - 知乎 (zhihu.com)](https://zhuanlan.zhihu.com/p/105276393)
-
----
-
-在React中，当组件被重渲染时，组件内的所有变量和方法都会被重新赋值和分配引用，如果当我们想保持住组件内一个值或者方法的引用保持不变，不随重渲染而被重新赋值和引用，那么就需要使用useRef。
-
-useRef的作用是保持对某一个值的引用. 同样，当你想对原生的DOM中某一个元素进行直接引用，那么也可以使用useRef。
-
-useRef所保持的元素或者值,在组件的整个生命周期内都返回同一个引用（一个可变的Ref对象）。
-
-useRef的使用方法：
-
-首先使用useRef来初始化一个ref，然后可以通过调用ref中的current来获取这个ref中最新的值，在整个组件的生命周期中，这个ref始终都是同一对象。
-
-```react
-import React, { useRef } from "react";
-
-export const TestComponent: React.FC<IProps> = (props) => {
-    const ref = useRef(0)
-    console.log(ref.current) // 这个current根据我们的定义是一个数字。它可以容纳任何类型
-    ...
-}
-```
-
-如果想把ref传递给其他组件，可以使用React.forwardRef来包裹该组件，然后被包裹的这个组件就可以在props旁边再加一个ref属性，被传递ref的这个组件就可以直接使用这个ref了
-
-useRef 可以用来直接获取原生DOM节点的引用
-
-```tsx
-import React, { useRef, useState } from "react";
-
-export const TestComponent: React.FC<IProps> = (props) => {
-    const ref = useRef<HTMLInputElement>(); // 这个ref现在就被定义成了一个HTMLInputElement对象
-    const [isShow, setIsShow] = useState(false)
-    return (
-    	<TestInput ref={ref}></TestInput>
-        <button onclick={()=>setIsShow(!isShow)}>toggle show input value</button>
-        {isShow && `Input Value:${ref.current.value}`} //现在这个ref所指向的对象已经是下面代码块中的那个input节点了，因此可以用ref.current.value来实时获取它的值
-    )
-}
-```
-
-```react
-export const TestInput = React.forwardRef((props, ref) => {
-    return (
-        <input ref={ref}></input>
-    )
-})
-```
-
-由于ref是一个始终指向同一引用的可变对象，**因此修改ref.current并不会导致页面的重渲染**
-
-### useMemo()
-
-useMemo是一个提高组件性能的钩子，它能够减少组件内开销很大的计算被不必要运行的次数。
-
-```typescript
-useMemo(fn: () => {}, dependency: any[])
-// fn为要执行的代码块，在组件首次渲染的时候它会被执行，此后如果dependency中的变量不发生变化，fn不会被重新执行，而是返回之前缓存的结果
-// denpendency 是一个数组，可以存放任何对象，一旦里面的内容发生变化，fn就会被重新执行并返回新结果
-```
-
-```typescript
-const result = useMemo(() => {
-	let addResult = 0;
-	for (let i = state; i < 10000000000; i++){
-		addResult += i
-	}
-	return addResult;
-}, [state])
-```
-
-### useCallback()
-
-参考链接：
-
-[React useCallback Hook (w3schools.com)](https://www.w3schools.com/react/react_usecallback.asp)
-
-useCallback跟useMemo类似，只不过它会返回一个函数，如果依赖数组中的对象或者变量保持不变，则这个函数不会被更新：
-
-```typescript
-const useInputWithUseCallback = () => {
-  const [ value, setValue ] = useState('')
-  const handleChange = useCallback(
-    (e) => setValue(e.target.value),
-    []
-  )
-  return [ value, handleChange ]
-} // 使用useCallback实现自定义钩子
-```
-
-useCallback 经常与 React.memo连用
-
-因为在React当中，每当组件被重渲染，组件中的函数都会被重新赋值和分配引用，因此新函数的引用跟被销毁组件中的函数根本不指向同一内存地址，两个对象只要引用不一样，那么默认情况下React会直接判定二者不是同一对象，从而导致React.memo判定达不到程序员想要的效果。
-
-这时候需要把要传给子组件的函数用useCallback所包裹起来，这时候如果依赖不变，那么这个函数将始终指向同一引用，这时候被React.memo包裹的子组件就能够接收到相同的函数对象了。
-
-### Custom Hooks
-
-自定义Hook的最终目的：共享相同的代码逻辑，减少代码冗余。
-
-自定义Hook就是一个函数，函数名以use开头，用use开头能让React将这个函数识别为一个hook，从而让其遵循[Hook规则](https://zh-hans.reactjs.org/docs/hooks-rules.html)
-
-程序员可以自行定义Custom Hook函数的参数和返回值
-
-```react
-export function useBeer(beerType: string) {
-    {data, loading, error} = useQuery(BEER_QUERY[beerType])
-    [price, setPrice] = useState(0)
-    if (data){
-        setPrice(data.beerInfo.price)
-    }
-    const setCrazySalePrice = (factor:number, bias:number) => {
-        this.setPrice(price * factor + bias)
-    }
-    return [price, setCrazySalePrice, loading]
-}
-```
-
-这个自定义Hook接收一个啤酒类别的参数，然后获取啤酒的实时价格，然后返回啤酒的价格state以及一个可以改变价格的函数和loading状态
 
